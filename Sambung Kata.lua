@@ -6,6 +6,7 @@ local TweenService = game:GetService("TweenService")
 local Player = Players.LocalPlayer
 local PlayerGui = Player:WaitForChild("PlayerGui")
 local UserInputService = game:GetService("UserInputService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
 
 -- // DATABASE CONFIG // --
 local URL_KAMUS = "https://raw.githubusercontent.com/geovedi/indonesian-wordlist/master/01-kbbi3-2001-sort-alpha.lst"
@@ -148,6 +149,40 @@ local listLayout = Instance.new("UIListLayout")
 listLayout.Padding = UDim.new(0, 5)
 listLayout.Parent = resultList
 
+-- // TAMBAHKAN FUNGSI INI // --
+local function autoTypeWord(kata)
+    task.spawn(function()
+        -- Ambil teks yang sudah ada di kolom input chat/text box jika mungkin
+        -- Namun, karena kita tidak bisa membaca isi chat game secara langsung dengan mudah,
+        -- kita gunakan logika: mengetik sisa huruf berdasarkan input di searchInput.
+        local currentInput = string.lower(searchInput.Text)
+        
+        -- Hitung sisa huruf yang harus diketik
+        local sisaKata = ""
+        if string.sub(kata, 1, #currentInput) == currentInput then
+            sisaKata = string.sub(kata, #currentInput + 1)
+        else
+            sisaKata = kata
+        end
+
+        -- Simulasi mengetik HANYA sisa karakter
+        for i = 1, #sisaKata do
+            local char = sisaKata:sub(i, i):upper()
+            local key = Enum.KeyCode[char]
+            if key then
+                VirtualInputManager:SendKeyEvent(true, key, false, game)
+                task.wait(0.05) 
+                VirtualInputManager:SendKeyEvent(false, key, false, game)
+            end
+        end
+        
+        -- Simulasi tekan ENTER
+        task.wait(0.1)
+        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Return, false, game)
+        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Return, false, game)
+    end)
+end
+
 -- // LOGIKA PENCARIAN // --
 local function cariKata()
     local inputTeks = string.lower(string.match(searchInput.Text, "%a+") or "")
@@ -180,10 +215,11 @@ local function cariKata()
         btn.Parent = resultList
         Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
 
+        -- // UBAH BAGIAN INI DI DALAM LOOP // --
         btn.MouseButton1Click:Connect(function()
-            if setclipboard then setclipboard(kata:upper()) end
+            autoTypeWord(kata) -- Panggil fungsi autotype
             KataTerpakai[kata] = true
-            searchInput.Text = "" -- Reset teks otomatis
+            searchInput.Text = "" 
             cariKata() 
         end)
     end
