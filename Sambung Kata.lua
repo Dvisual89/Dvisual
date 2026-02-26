@@ -199,7 +199,12 @@ local function cariKata()
     end
     
     table.sort(hasilDitemukan, function(a, b)
-		if sortMode == "IK" then
+		if sortMode == "UD" then
+            local aUd = string.sub(a, -2) == "ud"
+            local bUd = string.sub(b, -2) == "ud"
+            if aUd ~= bUd then return aUd end
+            return #a < #b
+		elseif sortMode == "IK" then
             local aIk = string.sub(a, -2) == "ik"
             local bIk = string.sub(b, -2) == "ik"
             if aIk ~= bIk then return aIk end
@@ -322,6 +327,8 @@ filterBtn.MouseButton1Click:Connect(function()
         sortMode = "US"
     elseif sortMode == "US" then
         sortMode = "IK"
+	elseif sortMode == "IK" then
+		sortMode = "UD"
     else 
         sortMode = "SHORT"
     end
@@ -345,7 +352,9 @@ filterBtn.MouseButton1Click:Connect(function()
     elseif sortMode == "US" then
         filterBtn.TextColor3 = Color3.fromRGB(255, 150, 255)
     elseif sortMode == "IK" then
-        filterBtn.TextColor3 = Color3.fromRGB(100, 255, 255) -- Tetap Biru Cyan yang kontras
+        filterBtn.TextColor3 = Color3.fromRGB(100, 255, 255)
+	elseif sortMode == "UD" then
+        filterBtn.TextColor3 = Color3.fromRGB(255, 120, 0) -- Warna Oranye untuk UD
     end
     
     cariKata()
