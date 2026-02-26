@@ -48,7 +48,7 @@ titleBar.BackgroundTransparency = 1
 titleBar.Parent = mainFrame
 
 local titleLabel = Instance.new("TextLabel")
-titleLabel.Text = "   KAMUS SAMBUNG"
+titleLabel.Text = "   KAMUS UDIN"
 titleLabel.Size = UDim2.new(1, -100, 1, 0)
 titleLabel.BackgroundTransparency = 1
 titleLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
