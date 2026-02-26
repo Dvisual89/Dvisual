@@ -12,7 +12,7 @@ local VirtualInputManager = game:GetService("VirtualInputManager")
 local URL_KAMUS = "https://raw.githubusercontent.com/geovedi/indonesian-wordlist/master/01-kbbi3-2001-sort-alpha.lst"
 local KamusIndonesia = {} 
 local KataTerpakai = {}   
-local sortMode = "Pendek" 
+local sortMode = "SHORT" 
 local isMinimized = false
 local originalSize = UDim2.new(0, 185, 0, 250)
 
@@ -199,7 +199,17 @@ local function cariKata()
     end
     
     table.sort(hasilDitemukan, function(a, b)
-        if sortMode == "Pendek" then return #a < #b else return #a > #b end
+        if sortMode == "NYA" then
+            -- Cek apakah berakhiran "nya"
+            local aNya = string.sub(a, -3) == "nya"
+            local bNya = string.sub(b, -3) == "nya"
+            if aNya ~= bNya then return aNya end
+            return #a < #b -- Jika sama-sama "nya", urutkan yang lebih pendek
+        elseif sortMode == "SHORT" then
+            return #a < #b
+        else -- Mode "LONG"
+            return #a > #b
+        end
     end)
 
     for i = 1, math.min(#hasilDitemukan, 30) do
@@ -266,9 +276,25 @@ end)
 
 -- // FILTER & EVENTS // --
 filterBtn.MouseButton1Click:Connect(function()
-    sortMode = (sortMode == "Pendek") and "Panjang" or "Pendek"
-    filterBtn.Text = (sortMode == "Pendek") and "SHORT" or "LONG"
-    filterBtn.TextColor3 = (sortMode == "Pendek") and Color3.fromRGB(0, 255, 200) or Color3.fromRGB(255, 100, 255)
+    -- Logika perpindahan mode (Cycle)
+    if sortMode == "SHORT" then
+        sortMode = "LONG"
+    elseif sortMode == "LONG" then
+        sortMode = "NYA"
+    else -- Jika "NYA", kembali ke "SHORT"
+        sortMode = "SHORT"
+    end
+    
+    -- Update tampilan UI tombol
+    filterBtn.Text = sortMode
+    if sortMode == "SHORT" then
+        filterBtn.TextColor3 = Color3.fromRGB(0, 255, 200)
+    elseif sortMode == "LONG" then
+        filterBtn.TextColor3 = Color3.fromRGB(255, 100, 255)
+    else -- Warna untuk "NYA"
+        filterBtn.TextColor3 = Color3.fromRGB(255, 200, 0)
+    end
+    
     cariKata()
 end)
 
