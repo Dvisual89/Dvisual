@@ -199,12 +199,41 @@ local function cariKata()
     end
     
     table.sort(hasilDitemukan, function(a, b)
-        if sortMode == "NYA" then
-            -- Cek apakah berakhiran "nya"
+		if sortMode == "IK" then
+            local aIk = string.sub(a, -2) == "ik"
+            local bIk = string.sub(b, -2) == "ik"
+            if aIk ~= bIk then return aIk end
+            return #a < #b
+        elseif sortMode == "US" then
+            local aUs = string.sub(a, -2) == "us"
+            local bUs = string.sub(b, -2) == "us"
+            if aUs ~= bUs then return aUs end
+            return #a < #b
+        elseif sortMode == "SME" then
+            local aSme = string.sub(a, -3) == "sme"
+            local bSme = string.sub(b, -3) == "sme"
+            if aSme ~= bSme then return aSme end
+            return #a < #b
+        elseif sortMode == "NG" then
+            local aNg = string.sub(a, -2) == "ng"
+            local bNg = string.sub(b, -2) == "ng"
+            if aNg ~= bNg then return aNg end
+            return #a < #b
+        elseif sortMode == "UH" then
+            local aUh = string.sub(a, -2) == "uh"
+            local bUh = string.sub(b, -2) == "uh"
+            if aUh ~= bUh then return aUh end
+            return #a < #b
+        elseif sortMode == "IF" then
+            local aIf = string.sub(a, -2) == "if"
+            local bIf = string.sub(b, -2) == "if"
+            if aIf ~= bIf then return aIf end
+            return #a < #b
+        elseif sortMode == "NYA" then
             local aNya = string.sub(a, -3) == "nya"
             local bNya = string.sub(b, -3) == "nya"
             if aNya ~= bNya then return aNya end
-            return #a < #b -- Jika sama-sama "nya", urutkan yang lebih pendek
+            return #a < #b
         elseif sortMode == "SHORT" then
             return #a < #b
         else -- Mode "LONG"
@@ -276,12 +305,24 @@ end)
 
 -- // FILTER & EVENTS // --
 filterBtn.MouseButton1Click:Connect(function()
-    -- Logika perpindahan mode (Cycle)
+    -- Logika perpindahan mode (Cycle: SHORT -> LONG -> NYA -> IF -> UH -> NG -> SME -> US -> IK -> SHORT)
     if sortMode == "SHORT" then
         sortMode = "LONG"
     elseif sortMode == "LONG" then
         sortMode = "NYA"
-    else -- Jika "NYA", kembali ke "SHORT"
+    elseif sortMode == "NYA" then
+        sortMode = "IF"
+    elseif sortMode == "IF" then
+        sortMode = "UH"
+    elseif sortMode == "UH" then
+        sortMode = "NG"
+    elseif sortMode == "NG" then
+        sortMode = "SME"
+    elseif sortMode == "SME" then
+        sortMode = "US"
+    elseif sortMode == "US" then
+        sortMode = "IK"
+    else 
         sortMode = "SHORT"
     end
     
@@ -291,8 +332,20 @@ filterBtn.MouseButton1Click:Connect(function()
         filterBtn.TextColor3 = Color3.fromRGB(0, 255, 200)
     elseif sortMode == "LONG" then
         filterBtn.TextColor3 = Color3.fromRGB(255, 100, 255)
-    else -- Warna untuk "NYA"
+    elseif sortMode == "NYA" then
         filterBtn.TextColor3 = Color3.fromRGB(255, 200, 0)
+    elseif sortMode == "IF" then
+        filterBtn.TextColor3 = Color3.fromRGB(100, 200, 255)
+    elseif sortMode == "UH" then
+        filterBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+    elseif sortMode == "NG" then
+        filterBtn.TextColor3 = Color3.fromRGB(150, 255, 100)
+    elseif sortMode == "SME" then
+        filterBtn.TextColor3 = Color3.fromRGB(255, 255, 100)
+    elseif sortMode == "US" then
+        filterBtn.TextColor3 = Color3.fromRGB(255, 150, 255)
+    elseif sortMode == "IK" then
+        filterBtn.TextColor3 = Color3.fromRGB(100, 255, 255) -- Tetap Biru Cyan yang kontras
     end
     
     cariKata()
