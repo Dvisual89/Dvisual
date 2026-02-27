@@ -166,7 +166,7 @@ local function autoTypeWord(kata)
             local key = Enum.KeyCode[char]
             if key then
                 VirtualInputManager:SendKeyEvent(true, key, false, game)
-                task.wait(0.125) 
+                task.wait(0.15) 
                 VirtualInputManager:SendKeyEvent(false, key, false, game)
             end
         end
