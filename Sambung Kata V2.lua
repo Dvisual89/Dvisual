@@ -150,6 +150,21 @@ local listLayout = Instance.new("UIListLayout")
 listLayout.Padding = UDim.new(0, 5)
 listLayout.Parent = resultList
 
+-- Dropdown Menu Container
+local dropdownFrame = Instance.new("ScrollingFrame")
+dropdownFrame.Size = UDim2.new(0, 80, 0, 150)
+dropdownFrame.Position = UDim2.new(0.75, -20, 0, 45) -- Muncul di bawah tombol filter
+dropdownFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+dropdownFrame.BorderSizePixel = 1
+dropdownFrame.BorderColor3 = Color3.fromRGB(60, 60, 70)
+dropdownFrame.ScrollBarThickness = 3
+dropdownFrame.Visible = false
+dropdownFrame.ZIndex = 10 -- Agar berada di atas list hasil
+dropdownFrame.Parent = contentFrame
+
+local dropdownLayout = Instance.new("UIListLayout", dropdownFrame)
+Instance.new("UICorner", dropdownFrame).CornerRadius = UDim.new(0, 6)
+
 -- // FUNGSI AUTOTYPE // --
 local function autoTypeWord(kata)
     task.spawn(function()
@@ -180,6 +195,10 @@ end
 -- // LOGIKA PENCARIAN // --
 local function cariKata()
     local inputTeks = string.lower(string.match(searchInput.Text, "%a+") or "")
+    
+    -- Tutup dropdown otomatis saat mengetik agar tidak menghalangi hasil
+    dropdownFrame.Visible = false 
+
     for _, child in pairs(resultList:GetChildren()) do
         if child:IsA("TextButton") then child:Destroy() end
     end
@@ -187,7 +206,8 @@ local function cariKata()
     
     local hasilDitemukan = {}
     for _, kataDiKamus in ipairs(KamusIndonesia) do
-        if string.sub(kataDiKamus, 1, #inputTeks) == inputTeks and not KataTerpakai[kataDiKamus] then
+        -- PERUBAHAN: Ditambahkan syarat #kataDiKamus >= 3
+        if #kataDiKamus >= 3 and string.sub(kataDiKamus, 1, #inputTeks) == inputTeks and not KataTerpakai[kataDiKamus] then
             table.insert(hasilDitemukan, kataDiKamus)
         end
     end
@@ -295,7 +315,7 @@ task.spawn(function()
         local count = 0
         for baris in string.gmatch(respons, "[^\r\n]+") do
             local kata = string.match(baris, "^(%a+)")
-            if kata and #kata > 1 then 
+            if kata and #kata >= 3 then 
                 table.insert(KamusIndonesia, string.lower(kata)) 
                 count = count + 1
             end
@@ -330,34 +350,46 @@ refreshBtn.MouseButton1Click:Connect(function()
     end)
 end)
 
--- // FILTER & EVENTS // --
+-- Konfigurasi Filter
+local filters = {
+    {name = "SHORT", color = Color3.fromRGB(0, 255, 200)},
+    {name = "LONG",  color = Color3.fromRGB(255, 100, 255)},
+    {name = "NYA",   color = Color3.fromRGB(255, 200, 0)},
+    {name = "IF",    color = Color3.fromRGB(100, 200, 255)},
+    {name = "UH",    color = Color3.fromRGB(255, 100, 100)},
+    {name = "NG",    color = Color3.fromRGB(150, 255, 100)},
+    {name = "SME",   color = Color3.fromRGB(255, 255, 100)},
+    {name = "US",    color = Color3.fromRGB(255, 150, 255)},
+    {name = "IK",    color = Color3.fromRGB(100, 255, 255)},
+    {name = "UD",    color = Color3.fromRGB(255, 120, 0)},
+    {name = "X",     color = Color3.fromRGB(255, 255, 255)}
+}
+
+-- Fungsi untuk membuat tombol di dalam dropdown
+for _, info in ipairs(filters) do
+    local opt = Instance.new("TextButton")
+    opt.Size = UDim2.new(1, 0, 0, 25)
+    opt.BackgroundTransparency = 1
+    opt.Text = info.name
+    opt.TextColor3 = info.color
+    opt.Font = Enum.Font.GothamBold
+    opt.TextSize = 10
+    opt.ZIndex = 11
+    opt.Parent = dropdownFrame
+
+    opt.MouseButton1Click:Connect(function()
+        sortMode = info.name
+        filterBtn.Text = info.name
+        filterBtn.TextColor3 = info.color
+        dropdownFrame.Visible = false -- Tutup menu setelah pilih
+        cariKata()
+    end)
+end
+dropdownFrame.CanvasSize = UDim2.new(0, 0, 0, #filters * 25)
+
+-- Logika Buka/Tutup Menu saat tombol filter diklik
 filterBtn.MouseButton1Click:Connect(function()
-    if sortMode == "SHORT" then sortMode = "LONG"
-    elseif sortMode == "LONG" then sortMode = "NYA"
-    elseif sortMode == "NYA" then sortMode = "IF"
-    elseif sortMode == "IF" then sortMode = "UH"
-    elseif sortMode == "UH" then sortMode = "NG"
-    elseif sortMode == "NG" then sortMode = "SME"
-    elseif sortMode == "SME" then sortMode = "US"
-    elseif sortMode == "US" then sortMode = "IK"
-    elseif sortMode == "IK" then sortMode = "UD"
-	elseif sortMode == "UD" then sortMode = "X"
-    else sortMode = "SHORT" end
-    
-    filterBtn.Text = sortMode
-    if sortMode == "SHORT" then filterBtn.TextColor3 = Color3.fromRGB(0, 255, 200)
-    elseif sortMode == "LONG" then filterBtn.TextColor3 = Color3.fromRGB(255, 100, 255)
-    elseif sortMode == "NYA" then filterBtn.TextColor3 = Color3.fromRGB(255, 200, 0)
-    elseif sortMode == "IF" then filterBtn.TextColor3 = Color3.fromRGB(100, 200, 255)
-    elseif sortMode == "UH" then filterBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
-    elseif sortMode == "NG" then filterBtn.TextColor3 = Color3.fromRGB(150, 255, 100)
-    elseif sortMode == "SME" then filterBtn.TextColor3 = Color3.fromRGB(255, 255, 100)
-    elseif sortMode == "US" then filterBtn.TextColor3 = Color3.fromRGB(255, 150, 255)
-    elseif sortMode == "IK" then filterBtn.TextColor3 = Color3.fromRGB(100, 255, 255)
-    elseif sortMode == "UD" then filterBtn.TextColor3 = Color3.fromRGB(255, 120, 0)
-    elseif sortMode == "X" then filterBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-	end
-    cariKata()
+    dropdownFrame.Visible = not dropdownFrame.Visible
 end)
 
 searchInput:GetPropertyChangedSignal("Text"):Connect(cariKata)
