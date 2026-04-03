@@ -193,7 +193,12 @@ local function cariKata()
     end
     
     table.sort(hasilDitemukan, function(a, b)
-        if sortMode == "UD" then
+        if sortMode == "X" then
+        local aX = string.sub(a, -1) == "x"
+        local bX = string.sub(b, -1) == "x"
+        if aX ~= bX then return aX end
+        return #a < #b
+		elseif sortMode == "UD" then
             local aUd = string.sub(a, -2) == "ud"
             local bUd = string.sub(b, -2) == "ud"
             if aUd ~= bUd then return aUd end
@@ -336,6 +341,7 @@ filterBtn.MouseButton1Click:Connect(function()
     elseif sortMode == "SME" then sortMode = "US"
     elseif sortMode == "US" then sortMode = "IK"
     elseif sortMode == "IK" then sortMode = "UD"
+	elseif sortMode == "UD" then sortMode = "X"
     else sortMode = "SHORT" end
     
     filterBtn.Text = sortMode
@@ -349,7 +355,8 @@ filterBtn.MouseButton1Click:Connect(function()
     elseif sortMode == "US" then filterBtn.TextColor3 = Color3.fromRGB(255, 150, 255)
     elseif sortMode == "IK" then filterBtn.TextColor3 = Color3.fromRGB(100, 255, 255)
     elseif sortMode == "UD" then filterBtn.TextColor3 = Color3.fromRGB(255, 120, 0)
-    end
+    elseif sortMode == "X" then filterBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	end
     cariKata()
 end)
 
