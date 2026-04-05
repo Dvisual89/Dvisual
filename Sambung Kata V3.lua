@@ -16,7 +16,8 @@ local sortMode = "SHORT"
 local isMinimized = false
 local originalSize = UDim2.new(0, 185, 0, 280) -- Ukuran ditambah sedikit untuk slider
 local typeDelay = 0.12 -- Default speed
-local antiBotMode = false
+local antiBotDelay = false -- Mode Jeda Acak
+local antiBotMistyping = false -- Mode Salah Ketik & Koreksi
 
 -- 1. FUNGSI PENGHANCUR
 local existingUI = PlayerGui:FindFirstChild(UI_NAME)
@@ -167,8 +168,8 @@ Instance.new("UICorner", sliderFill).CornerRadius = UDim.new(0, 4)
 
 -- // UPDATE LOGIKA SLIDER // --
 local function updateSlider(input)
-    -- Tambahkan pengecekan ini:
-    if antiBotMode then return end 
+    -- Perbaikan: Menggunakan antiBotDelay (bukan antiBotMode) agar sinkron dengan tombol
+    if antiBotDelay then return end 
     
     local pos = math.clamp((input.Position.X - sliderFrame.AbsolutePosition.X) / sliderFrame.AbsoluteSize.X, 0, 1)
     sliderFill.Size = UDim2.new(pos, 0, 1, 0)
@@ -230,28 +231,67 @@ local function autoTypeWord(kata)
                          and string.sub(kata, #currentInput + 1) 
                          or kata
 
+        local neighbors = {
+            A="S", S="AD", D="SF", F="DG", G="FH", H="GJ", J="HK", K="JL", L="K",
+            Q="W", W="QE", E="WR", R="ET", T="RY", Y="TU", U="YI", I="UO", O="IP", P="O",
+            Z="X", X="ZC", C="XV", V="CB", B="VN", N="BM", M="N"
+        }
+
         for i = 1, #sisaKata do
             local char = sisaKata:sub(i, i):upper()
             local key = Enum.KeyCode[char]
             
             if key then
-                -- Menghitung delay acak jika Antibot Aktif
-                -- Rentang: typeDelay sampai (typeDelay + 0.15 detik)
-                local actualDelay = antiBotMode 
-                    and (typeDelay + math.random(0, 150) / 1000) 
-                    or typeDelay
+                -- // LOGIKA MISTYPING //
+                if antiBotMistyping and math.random(1, 12) == 1 then
+                    local neighborChars = neighbors[char] or "ASDF"
+                    local randomIdx = math.random(1, #neighborChars)
+                    local wrongChar = neighborChars:sub(randomIdx, randomIdx)
+                    local wrongKey = Enum.KeyCode[wrongChar]
+
+                    if wrongKey then
+                        VirtualInputManager:SendKeyEvent(true, wrongKey, false, game)
+                        task.wait(typeDelay)
+                        VirtualInputManager:SendKeyEvent(false, wrongKey, false, game)
+                        
+                        task.wait(math.random(20, 45) / 100) -- Jeda "sadar salah"
+                        
+                        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Backspace, false, game)
+                        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Backspace, false, game)
+                        
+                        task.wait(math.random(15, 25) / 100) -- Jeda sebelum membenarkan
+                    end
+                end
+
+                -- // PENGETIKAN NORMAL //
+                local actualDelay = typeDelay
+                if antiBotDelay then
+                    actualDelay = typeDelay + (math.random(-40, 120) / 1000)
+                end
 
                 VirtualInputManager:SendKeyEvent(true, key, false, game)
-                task.wait(actualDelay) 
+                task.wait(math.max(0.02, actualDelay))
                 VirtualInputManager:SendKeyEvent(false, key, false, game)
                 
-                -- Jeda antar karakter (inter-key delay)
                 task.wait(actualDelay / 2)
             end
         end
         
-        -- Delay sebelum menekan Enter agar lebih natural
-        local enterDelay = antiBotMode and (0.1 + math.random(5, 20) / 100) or 0.1
+        -- // FIX: VERIFIKASI SEBELUM ENTER // --
+        -- Kita tunggu sebentar sampai UI Roblox/TextBox memproses input terakhir
+        task.wait(0.1) 
+        
+        -- Cari TextBox game (biasanya target otomatis game Sambung Kata)
+        local targetBox = UserInputService:GetFocusedTextBox()
+        
+        -- Jika teks di box belum sama dengan kata target, jangan tekan Enter dulu
+        if targetBox and string.lower(targetBox.Text) ~= string.lower(kata) then
+            -- Tambahkan jeda ekstra untuk memastikan Backspace/Typo sudah selesai diproses
+            repeat task.wait(0.05) until string.lower(targetBox.Text) == string.lower(kata)
+        end
+        
+        -- Jeda Enter yang lebih manusiawi
+        local enterDelay = antiBotDelay and (0.15 + math.random(10, 30) / 100) or 0.1
         task.wait(enterDelay)
         
         VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Return, false, game)
@@ -452,43 +492,46 @@ end)
 searchInput:GetPropertyChangedSignal("Text"):Connect(cariKata)
 closeBtn.MouseButton1Click:Connect(function() screenGui:Destroy() end)
 
--- Antibot Button
-local antiBotBtn = Instance.new("TextButton")
-antiBotBtn.Size = UDim2.new(0.9, 0, 0, 25)
-antiBotBtn.Position = UDim2.new(0.05, 0, 1, -28) -- Letakkan di bagian paling bawah contentFrame
-antiBotBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-antiBotBtn.TextColor3 = Color3.fromRGB(255, 100, 100) -- Merah (Off)
-antiBotBtn.Text = "ANTIBOT: OFF"
-antiBotBtn.Font = Enum.Font.GothamBold
-antiBotBtn.TextSize = 10
-antiBotBtn.Parent = contentFrame
-Instance.new("UICorner", antiBotBtn).CornerRadius = UDim.new(0, 6)
+-- Tombol Anti-Bot: Random Delay
+local delayBtn = Instance.new("TextButton")
+delayBtn.Size = UDim2.new(0.43, 0, 0, 25)
+delayBtn.Position = UDim2.new(0.05, 0, 1, -28)
+delayBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+delayBtn.Text = "RANDOM DELAY"
+delayBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+delayBtn.Font = Enum.Font.GothamBold
+delayBtn.TextSize = 8
+delayBtn.Parent = contentFrame
+Instance.new("UICorner", delayBtn).CornerRadius = UDim.new(0, 6)
 
-antiBotBtn.MouseButton1Click:Connect(function()
-    antiBotMode = not antiBotMode
-    if antiBotMode then
-        -- State: ON
-        antiBotBtn.Text = "ANTIBOT: ON"
-        antiBotBtn.TextColor3 = Color3.fromRGB(100, 255, 100)
-        antiBotBtn.BackgroundColor3 = Color3.fromRGB(30, 50, 30)
-        
-        -- Visual Lock untuk Slider
-        sliderFrame.BackgroundTransparency = 0.5
-        sliderFill.BackgroundTransparency = 0.5
-        sliderLabel.Text = "LOCKED BY ANTIBOT"
-        sliderLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-    else
-        -- State: OFF
-        antiBotBtn.Text = "ANTIBOT: OFF"
-        antiBotBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
-        antiBotBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-        
-        -- Restore Slider
-        sliderFrame.BackgroundTransparency = 0
-        sliderFill.BackgroundTransparency = 0
-        sliderLabel.Text = string.format("DELAY: %.2fs", typeDelay)
-        sliderLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
-    end
+-- Tombol Anti-Bot: Mistyping
+local mistypingBtn = Instance.new("TextButton")
+mistypingBtn.Size = UDim2.new(0.43, 0, 0, 25)
+mistypingBtn.Position = UDim2.new(0.52, 0, 1, -28)
+mistypingBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+mistypingBtn.Text = "HUMAN TYPO"
+mistypingBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+mistypingBtn.Font = Enum.Font.GothamBold
+mistypingBtn.TextSize = 8
+mistypingBtn.Parent = contentFrame
+Instance.new("UICorner", mistypingBtn).CornerRadius = UDim.new(0, 6)
+
+-- Event Listener Delay
+delayBtn.MouseButton1Click:Connect(function()
+    antiBotDelay = not antiBotDelay
+    delayBtn.TextColor3 = antiBotDelay and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 100, 100)
+    delayBtn.BackgroundColor3 = antiBotDelay and Color3.fromRGB(30, 50, 30) or Color3.fromRGB(40, 40, 40)
+    
+    -- Lock slider jika delay otomatis aktif
+    sliderFrame.BackgroundTransparency = antiBotDelay and 0.5 or 0
+    sliderLabel.Text = antiBotDelay and "AUTO DELAY" or string.format("DELAY: %.2fs", typeDelay)
+end)
+
+-- Event Listener Mistyping
+mistypingBtn.MouseButton1Click:Connect(function()
+    antiBotMistyping = not antiBotMistyping
+    mistypingBtn.TextColor3 = antiBotMistyping and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 100, 100)
+    mistypingBtn.BackgroundColor3 = antiBotMistyping and Color3.fromRGB(30, 50, 30) or Color3.fromRGB(40, 40, 40)
 end)
 
 -- // DRAGGING LOGIC // --
