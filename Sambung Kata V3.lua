@@ -317,7 +317,26 @@ local function cariKata()
     end
     
     table.sort(hasilDitemukan, function(a, b)
-        if sortMode == "X" then
+		if sortMode == "KILLER" then
+			local hurufMati = {["x"]=1, ["z"]=2, ["q"]=3, ["v"]=4, ["j"]=5}
+			local akhirA = hurufMati[string.sub(a, -1)] or 10
+			local akhirB = hurufMati[string.sub(b, -1)] or 10
+			
+			if akhirA ~= akhirB then
+				return akhirA < akhirB -- Prioritaskan X, lalu Z, dst.
+			end
+			return #a > #b -- Jika sama-sama akhiran sulit, pilih yang paling panjang
+		elseif sortMode == "NORMAL" then
+			local aNormal = #a >= 5 and #a <= 8
+			local bNormal = #b >= 5 and #b <= 8
+			if aNormal ~= bNormal then return aNormal end
+			return #a < #b -- Jika sama-sama normal, utamakan yang lebih pendek
+        elseif sortMode == "KS" then
+			local aKs = string.sub(a, -2) == "ks"
+			local bKs = string.sub(b, -2) == "ks"
+			if aKs ~= bKs then return aKs end
+			return #a < #b
+		elseif sortMode == "X" then
             local aX = string.sub(a, -1) == "x"
             local bX = string.sub(b, -1) == "x"
             if aX ~= bX then return aX end
@@ -394,36 +413,48 @@ end
 
 -- // LOAD DATABASE // --
 task.spawn(function()
-    searchInput.PlaceholderText = "Sedang memuat..."
+    searchInput.PlaceholderText = "Mencari Database..."
+    
+    -- Menambah lebih banyak sumber repositori kata bahasa Indonesia
     local links = {
-        "https://raw.githubusercontent.com/geovedi/indonesian-wordlist/master/01-kbbi3-2001-sort-alpha.lst",
-        "https://raw.githubusercontent.com/Lionel-Yong/Kamus-Besar-Bahasa-Indonesia/master/kbbi.txt",
-        "https://raw.githubusercontent.com/pujangga123/indonesian-wordlist/master/indonesian-words.txt"
-    }
-    local sukses = false
-    local respons = ""
+		"https://raw.githubusercontent.com/Lionel-Yong/Kamus-Besar-Bahasa-Indonesia/master/kbbi.txt",
+		"https://raw.githubusercontent.com/pujangga123/indonesian-wordlist/master/indonesian-words.txt",
+		"https://raw.githubusercontent.com/geovedi/indonesian-wordlist/master/01-kbbi3-2001-sort-alpha.lst",
+		"https://raw.githubusercontent.com/ajie6fd/Kamus-Bahasa-Indonesia/master/daftar_kata.txt",
+		"https://raw.githubusercontent.com/HadiDotSh/Indonesian-Wordlist/master/indonesian-words-list.txt"
+	}
+
+    local kataUnik = {} -- Menggunakan tabel temporary agar tidak ada kata duplikat
+    local count = 0
+
     for _, url in ipairs(links) do
-        if not sukses then
-            local s, r = pcall(function() return game:HttpGet(url) end)
-            if s and #r > 100 then
-                sukses = s
-                respons = r
+        local s, r = pcall(function() return game:HttpGet(url) end)
+        if s and #r > 100 then
+            -- Proses ekstraksi kata
+            for baris in string.gmatch(r, "[^\r\n]+") do
+                -- Membersihkan kata dari spasi, angka, atau simbol
+                local kata = string.lower(string.match(baris, "%a+") or "")
+                
+                -- Filter: Minimal 3 huruf dan belum ada di daftar
+                if #kata >= 3 and not kataUnik[kata] then
+                    kataUnik[kata] = true
+                    table.insert(KamusIndonesia, kata)
+                    count = count + 1
+                end
             end
         end
+        -- Update teks progres setiap kali satu link selesai dimuat
+        searchInput.PlaceholderText = "Memuat: " .. count .. " kata..."
     end
-    if sukses then
-        local count = 0
-        for baris in string.gmatch(respons, "[^\r\n]+") do
-            local kata = string.match(baris, "^(%a+)")
-            if kata and #kata >= 3 then 
-                table.insert(KamusIndonesia, string.lower(kata)) 
-                count = count + 1
-            end
-        end
-        searchInput.PlaceholderText = "Siap ("..count.." kata)"
+
+    if count > 0 then
+        searchInput.PlaceholderText = "Siap (" .. count .. " Kata)"
     else
         searchInput.PlaceholderText = "Koneksi Bermasalah!"
     end
+    
+    -- Bersihkan tabel temporary untuk menghemat memori
+    kataUnik = nil 
 end)
 
 -- // MINIMIZE LOGIC // --
@@ -452,6 +483,8 @@ end)
 
 -- Filter Buttons Logic
 local filters = {
+	{name = "KILLER", color = Color3.fromRGB(255, 0, 0)},
+	{name = "NORMAL", color = Color3.fromRGB(0, 255, 100)},
     {name = "SHORT", color = Color3.fromRGB(0, 255, 200)},
     {name = "LONG",  color = Color3.fromRGB(255, 100, 255)},
     {name = "NYA",   color = Color3.fromRGB(255, 200, 0)},
@@ -462,7 +495,8 @@ local filters = {
     {name = "US",    color = Color3.fromRGB(255, 150, 255)},
     {name = "IK",    color = Color3.fromRGB(100, 255, 255)},
     {name = "UD",    color = Color3.fromRGB(255, 120, 0)},
-    {name = "X",     color = Color3.fromRGB(255, 255, 255)}
+    {name = "X",     color = Color3.fromRGB(255, 255, 255)},
+	{name = "KS", color = Color3.fromRGB(255, 50, 150)},
 }
 
 for _, info in ipairs(filters) do
