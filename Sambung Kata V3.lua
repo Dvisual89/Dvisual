@@ -243,25 +243,34 @@ local function autoTypeWord(kata)
             
             if key then
                 -- // LOGIKA MISTYPING //
-                if antiBotMistyping and math.random(1, 12) == 1 then
-                    local neighborChars = neighbors[char] or "ASDF"
-                    local randomIdx = math.random(1, #neighborChars)
-                    local wrongChar = neighborChars:sub(randomIdx, randomIdx)
-                    local wrongKey = Enum.KeyCode[wrongChar]
+                if antiBotMistyping and math.random(1, 20) == 1 then -- Probabilitas 1 banding 20
+					local neighborChars = neighbors[char] or "ASDF"
+					local randomIdx = math.random(1, #neighborChars)
+					local wrongChar = neighborChars:sub(randomIdx, randomIdx)
+					local wrongKey = Enum.KeyCode[wrongChar]
 
-                    if wrongKey then
-                        VirtualInputManager:SendKeyEvent(true, wrongKey, false, game)
-                        task.wait(typeDelay)
-                        VirtualInputManager:SendKeyEvent(false, wrongKey, false, game)
-                        
-                        task.wait(math.random(20, 45) / 100) -- Jeda "sadar salah"
-                        
-                        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Backspace, false, game)
-                        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Backspace, false, game)
-                        
-                        task.wait(math.random(15, 25) / 100) -- Jeda sebelum membenarkan
-                    end
-                end
+					if wrongKey then
+						-- Mengetik huruf yang salah
+						VirtualInputManager:SendKeyEvent(true, wrongKey, false, game)
+						task.wait(typeDelay)
+						VirtualInputManager:SendKeyEvent(false, wrongKey, false, game)
+						
+						-- Jeda "Reaction Time" (waktu sadar salah ketik) yang acak
+						task.wait(math.random(25, 60) / 100) 
+						
+						-- Proses Backspace dengan kecepatan bervariasi (Human-like)
+						local backspaceCount = 1 -- Anda bisa menambah ini jika ingin simulasi salah banyak huruf
+						for i = 1, backspaceCount do
+							VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Backspace, false, game)
+							-- Jeda antar backspace jika menghapus banyak
+							task.wait(math.random(5, 15) / 100) 
+							VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Backspace, false, game)
+						end
+						
+						-- Jeda sejenak sebelum mulai mengetik huruf yang benar lagi
+						task.wait(math.random(15, 35) / 100) 
+					end
+				end
 
                 -- // PENGETIKAN NORMAL //
                 local actualDelay = typeDelay
