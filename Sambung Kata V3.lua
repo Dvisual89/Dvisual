@@ -237,69 +237,83 @@ local function autoTypeWord(kata)
             Z="X", X="ZC", C="XV", V="CB", B="VN", N="BM", M="N"
         }
 
-        for i = 1, #sisaKata do
+        local i = 1
+        while i <= #sisaKata do
             local char = sisaKata:sub(i, i):upper()
             local key = Enum.KeyCode[char]
             
             if key then
-                -- // LOGIKA MISTYPING //
-                if antiBotMistyping and math.random(1, 20) == 1 then -- Probabilitas 1 banding 20
-					local neighborChars = neighbors[char] or "ASDF"
-					local randomIdx = math.random(1, #neighborChars)
-					local wrongChar = neighborChars:sub(randomIdx, randomIdx)
-					local wrongKey = Enum.KeyCode[wrongChar]
+                -- // LOGIKA MISTYPING DENGAN INERSIA (Sadar setelah beberapa huruf) //
+                if antiBotMistyping and math.random(1, 25) == 1 then 
+                    -- Tentukan berapa banyak huruf "salah" yang diketik sebelum sadar (1-4 huruf)
+                    local inersia = math.random(1, 4)
+                    local hurufTerlanjurDiketis = {}
 
-					if wrongKey then
-						-- Mengetik huruf yang salah
-						VirtualInputManager:SendKeyEvent(true, wrongKey, false, game)
-						task.wait(typeDelay)
-						VirtualInputManager:SendKeyEvent(false, wrongKey, false, game)
-						
-						-- Jeda "Reaction Time" (waktu sadar salah ketik) yang acak
-						task.wait(math.random(25, 60) / 100) 
-						
-						-- Proses Backspace dengan kecepatan bervariasi (Human-like)
-						local backspaceCount = 1 -- Anda bisa menambah ini jika ingin simulasi salah banyak huruf
-						for i = 1, backspaceCount do
-							VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Backspace, false, game)
-							-- Jeda antar backspace jika menghapus banyak
-							task.wait(math.random(5, 15) / 100) 
-							VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Backspace, false, game)
-						end
-						
-						-- Jeda sejenak sebelum mulai mengetik huruf yang benar lagi
-						task.wait(math.random(15, 35) / 100) 
-					end
-				end
+                    for j = 1, inersia do
+                        local targetChar = sisaKata:sub(i + j - 1, i + j - 1)
+                        if not targetChar or targetChar == "" then break end
+                        
+                        -- Huruf pertama adalah typo tetangga, sisanya bisa typo atau huruf lanjutannya
+                        local typoChar
+                        if j == 1 then
+                            local neighborChars = neighbors[targetChar:upper()] or "ASDF"
+                            typoChar = neighborChars:sub(math.random(1, #neighborChars), math.random(1, #neighborChars))
+                        else
+                            -- Simulasi jari terpeleset ke tombol acak atau tetap lanjut mengetik kata asli tapi salah posisi
+                            typoChar = (math.random(1, 2) == 1) and targetChar or "X" 
+                        end
 
-                -- // PENGETIKAN NORMAL //
-                local actualDelay = typeDelay
-                if antiBotDelay then
-                    actualDelay = typeDelay + (math.random(-40, 120) / 1000)
+                        local typoKey = Enum.KeyCode[typoChar:upper()]
+                        if typoKey then
+                            VirtualInputManager:SendKeyEvent(true, typoKey, false, game)
+                            task.wait(math.random(5, 12) / 100)
+                            VirtualInputManager:SendKeyEvent(false, typoKey, false, game)
+                            table.insert(hurufTerlanjurDiketis, typoKey)
+                            task.wait(typeDelay)
+                        end
+                    end
+
+                    -- Jeda "Reaction Time" (Momen menyadari kesalahan)
+                    task.wait(math.random(30, 70) / 100) 
+
+                    -- Hapus semua huruf yang salah (Backspacing)
+                    for count = 1, #hurufTerlanjurDiketis do
+                        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Backspace, false, game)
+                        task.wait(math.random(4, 10) / 100) -- Kecepatan hapus bervariasi
+                        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Backspace, false, game)
+                        task.wait(0.05)
+                    end
+
+                    -- Jeda sebelum memperbaiki
+                    task.wait(math.random(20, 40) / 100)
+                    
+                    -- Jangan naikkan index 'i', agar dia mengulang huruf yang sama tadi dengan benar
+                else
+                    -- // PENGETIKAN NORMAL //
+                    local actualDelay = typeDelay
+                    if antiBotDelay then
+                        actualDelay = typeDelay + (math.random(-40, 120) / 1000)
+                    end
+
+                    VirtualInputManager:SendKeyEvent(true, key, false, game)
+                    task.wait(math.max(0.02, actualDelay))
+                    VirtualInputManager:SendKeyEvent(false, key, false, game)
+                    
+                    task.wait(actualDelay / 2)
+                    i = i + 1 -- Lanjut ke huruf berikutnya
                 end
-
-                VirtualInputManager:SendKeyEvent(true, key, false, game)
-                task.wait(math.max(0.02, actualDelay))
-                VirtualInputManager:SendKeyEvent(false, key, false, game)
-                
-                task.wait(actualDelay / 2)
+            else
+                i = i + 1
             end
         end
         
-        -- // FIX: VERIFIKASI SEBELUM ENTER // --
-        -- Kita tunggu sebentar sampai UI Roblox/TextBox memproses input terakhir
+        -- Verifikasi Akhir & Enter
         task.wait(0.1) 
-        
-        -- Cari TextBox game (biasanya target otomatis game Sambung Kata)
         local targetBox = UserInputService:GetFocusedTextBox()
-        
-        -- Jika teks di box belum sama dengan kata target, jangan tekan Enter dulu
         if targetBox and string.lower(targetBox.Text) ~= string.lower(kata) then
-            -- Tambahkan jeda ekstra untuk memastikan Backspace/Typo sudah selesai diproses
             repeat task.wait(0.05) until string.lower(targetBox.Text) == string.lower(kata)
         end
         
-        -- Jeda Enter yang lebih manusiawi
         local enterDelay = antiBotDelay and (0.15 + math.random(10, 30) / 100) or 0.1
         task.wait(enterDelay)
         
