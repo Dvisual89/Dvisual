@@ -18,6 +18,9 @@ local Following = false
 local FollowConnection = nil
 local Headsitting = false
 local HeadsitConnection = nil
+local Flying = false
+local FlySpeed = 50 -- Ini nilai default yang akan diubah oleh UI
+local FlyConnection = nil
 
 local SavedAnimations = {
     ["Idle"] = nil, ["Walk"] = nil, ["Run"] = nil,
@@ -214,7 +217,8 @@ local homeTabFrame = CreateTabFrame("Home", false)
 local avatarTabFrame = CreateTabFrame("Avatar", false)
 local animTabFrame = CreateTabFrame("Animation", false) 
 local characterTabFrame = CreateTabFrame("Character", false)
-local movementTabFrame = CreateTabFrame("Movement", false)-- Tambahkan ini
+local movementTabFrame = CreateTabFrame("Movement", false)
+local catalogTabFrame = CreateTabFrame("Catalog", false)-- Tambahkan ini
 
 local function showTab(tabName)
     infoTabFrame.Visible = (tabName == "Info")
@@ -222,7 +226,8 @@ local function showTab(tabName)
     avatarTabFrame.Visible = (tabName == "Avatar")
 	animTabFrame.Visible = (tabName == "Animation") 
 	characterTabFrame.Visible = (tabName == "Character")
-	movementTabFrame.Visible = (tabName == "Movement")-- Tambahkan ini
+	movementTabFrame.Visible = (tabName == "Movement")
+	catalogTabFrame.Visible = (tabName == "Catalog") -- Tambahkan ini
 end
 
 local function CreateTabBtn(icon, label, name, hasSeparator)
@@ -256,6 +261,7 @@ CreateTabBtn("👤", "Info", "Info", true)
 CreateTabBtn("🏠", "Main", "Home", true)
 CreateTabBtn("👕", "Avatar", "Avatar", false)
 CreateTabBtn("🏃", "Animation", "Animation", false) 
+CreateTabBtn("🗂️", "Catalog", "Catalog", false) -- Tambahkan Button Catalog di sini
 CreateTabBtn("", "Character", "Character", false)
 CreateTabBtn("⚡", "Move", "Movement", false)-- Tambahkan ini
 
@@ -287,6 +293,54 @@ CreateInfoLabel("Account Age: " .. player.AccountAge .. " Days")
 CreateInfoLabel("Join Date: " .. GetJoinDate()) -- Menampilkan Join Date
 CreateInfoLabel("Game: " .. gName)
 
+local function BorrowSelectedPlayerAvatar(targetUsername)
+    local targetPlayer = Players:FindFirstChild(targetUsername)
+    if targetPlayer then
+        local char = player.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        
+        if hum then
+            local success, desc = pcall(function()
+                return Players:GetHumanoidDescriptionFromUserId(targetPlayer.UserId)
+            end)
+            
+            if success and desc then
+                pcall(function()
+                    if hum["ApplyDescriptionClientServer"] then
+                        hum:ApplyDescriptionClientServer(desc)
+                    else
+                        hum:ApplyDescription(desc)
+                    end
+                end)
+                ShowNotification("Successfully borrowed avatar!")
+            else
+                ShowNotification("Failed to fetch player data.")
+            end
+        end
+    else
+        ShowNotification("Player not found in server.")
+    end
+end
+
+local function ApplySteal(targetUserId)
+    local char = player.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        local success, desc = pcall(function()
+            return Players:GetHumanoidDescriptionFromUserId(targetUserId)
+        end)
+        if success and desc then
+            -- Menggunakan pcall untuk menghindari error jika proses apply gagal
+            pcall(function()
+                hum:ApplyDescription(desc)
+            end)
+            ShowNotification("Avatar Copied!")
+        else
+            ShowNotification("Failed to fetch Avatar.")
+        end
+    end
+end
+
 --- --- 🔹 ISI TAB HOME 🔹 --- ---
 local function AddScriptButton(name, callback, parent)
     local btn = Instance.new("TextButton")
@@ -310,6 +364,21 @@ end)
 
 AddScriptButton("Infinite Yield", function()
     loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))()
+    ShowNotification("Animation Executed!")
+end)
+
+AddScriptButton("Bring Coil", function()
+    loadstring(game:HttpGet("https://gist.githubusercontent.com/Ahma174/4e504a62e822daa3039192afa9752713/raw/8ff97c8f86d016ef9ad719f03c3aaf0ccc897bd1/gistfile1.txt"))()
+    ShowNotification("Animation Executed!")
+end)
+
+AddScriptButton("Sambung Kata V3", function()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/Dvisual89/Dvisual/refs/heads/main/Sambung%20Kata%20V3.lua"))()
+    ShowNotification("Animation Executed!")
+end)
+
+AddScriptButton("Remotespy Fayint", function()
+    loadstring(game:HttpGet("https://fayintz.my.id/api/loader/Scanner-Remote"))()
     ShowNotification("Animation Executed!")
 end)
 
@@ -424,6 +493,98 @@ copyAvaBtn.MouseButton1Click:Connect(function()
     end
 end)
 
+--- --- 🔹 ISI TAB CATALOG (PRO LIST) 🔹 --- ---
+
+-- Container Utama untuk List (Scrolling)
+local catalogListFrame = Instance.new("ScrollingFrame")
+catalogListFrame.Parent = catalogTabFrame
+catalogListFrame.Size = UDim2.new(1, 0, 1, -45) -- Sisakan ruang untuk tombol reset di bawah
+catalogListFrame.BackgroundTransparency = 1
+catalogListFrame.ScrollBarThickness = 2
+catalogListFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+
+local listLayout = Instance.new("UIListLayout")
+listLayout.Parent = catalogListFrame
+listLayout.Padding = UDim.new(0, 5)
+listLayout.SortOrder = Enum.SortOrder.Name
+
+-- Fungsi untuk Membuat Baris Pemain
+local function CreatePlayerRow(p)
+    if p == player then return end -- Jangan munculkan diri sendiri
+
+    local row = Instance.new("Frame")
+    row.Name = p.Name
+    row.Size = UDim2.new(1, -5, 0, 45)
+    row.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    row.BackgroundTransparency = 0.5
+    row.Parent = catalogListFrame
+    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 6)
+
+    local pName = Instance.new("TextLabel")
+    pName.Size = UDim2.new(0.7, 0, 0.5, 0)
+    pName.Position = UDim2.new(0, 10, 0, 5)
+    pName.Text = p.DisplayName
+    pName.TextColor3 = Color3.new(1, 1, 1)
+    pName.Font = Enum.Font.GothamBold
+    pName.TextSize = 12
+    pName.TextXAlignment = Enum.TextXAlignment.Left
+    pName.BackgroundTransparency = 1
+    pName.Parent = row
+
+    local pUser = Instance.new("TextLabel")
+    pUser.Size = UDim2.new(0.7, 0, 0.4, 0)
+    pUser.Position = UDim2.new(0, 10, 0.5, 2)
+    pUser.Text = "@" .. p.Name
+    pUser.TextColor3 = Color3.fromRGB(180, 180, 180)
+    pUser.Font = Enum.Font.Gotham
+    pUser.TextSize = 10
+    pUser.TextXAlignment = Enum.TextXAlignment.Left
+    pUser.BackgroundTransparency = 1
+    pUser.Parent = row
+
+    local stealBtn = Instance.new("TextButton")
+    stealBtn.Size = UDim2.new(0, 60, 0, 25)
+    stealBtn.Position = UDim2.new(1, -70, 0.5, -12)
+    stealBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
+    stealBtn.Text = "STEAL"
+    stealBtn.TextColor3 = Color3.new(1, 1, 1)
+    stealBtn.Font = Enum.Font.GothamBold
+    stealBtn.TextSize = 10
+    stealBtn.Parent = row
+    Instance.new("UICorner", stealBtn).CornerRadius = UDim.new(0, 4)
+
+    stealBtn.MouseButton1Click:Connect(function()
+        ApplySteal(p.UserId)
+    end)
+end
+
+-- Refresh List secara otomatis
+local function RefreshCatalog()
+    for _, child in pairs(catalogListFrame:GetChildren()) do
+        if child:IsA("Frame") then child:Destroy() end
+    end
+    for _, p in pairs(Players:GetPlayers()) do
+        CreatePlayerRow(p)
+    end
+end
+
+Players.PlayerAdded:Connect(RefreshCatalog)
+Players.PlayerRemoving:Connect(RefreshCatalog)
+RefreshCatalog()
+
+-- Tombol Reset di paling bawah tab
+local resetAll = AddScriptButton("🔄 RESET AVATAR", function()
+    player:LoadCharacter()
+    ShowNotification("Character Reloaded")
+end, catalogTabFrame)
+resetAll.Size = UDim2.new(1, 0, 0, 35)
+resetAll.Position = UDim2.new(0, 0, 1, -35)
+resetAll.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+
+listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    catalogListFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y)
+end)
+
 --- --- 🔹 SISTEM ANIMASI UNIVERSAL 🔹 --- ---
 
 local function ApplyInstantAnimation(category, data)
@@ -486,6 +647,9 @@ local AnimationData = {
     ["Idle"] = {
 		["AuraAnimationPack"] = {"18747067405", "507766666"},
         ["2016 Animation (mm2)"] = {"387947158", "387947464"},
+		["AuraFarming"] = {"138665010911335", "138665010911335"},
+		["Borock"] = {"3293641938", "3293642554"},
+		["cesus"] = {"115879733952840", "115879733952840"},
         ["(UGC) Oh Really?"] = {"98004748982532", "98004748982532"},
         ["Astronaut"] = {"891621366", "891633237"},
         ["Adidas Community"] = {"122257458498464", "102357151005774"},
@@ -552,22 +716,267 @@ local AnimationData = {
         ["Unboxed By Amazon"] = {"98281136301627", "138183121662404"}
     },
     ["Walk"] = {
-        ["AuraAnimationPack"] = "18747074203", ["Geto"] = "85811471336028", ["Patrol"] = "1151231493", ["Drooling Zombie"] = "3489174223", ["Adidas Community"] = "122150855457006", ["Levitation"] = "616013216", ["Catwalk Glam"] = "109168724482748", ["Knight"] = "10921127095", ["Pirate"] = "750785693", ["Bold"] = "16738340646", ["Sports (Adidas)"] = "18537392113", ["Zombie"] = "616168032", ["Astronaut"] = "891667138", ["Cartoony"] = "742640026", ["Ninja"] = "656121766", ["Confident"] = "1070017263", ["Wicked \"Dancing Through Life\""] = "73718308412641", ["Unboxed By Amazon"] = "90478085024465", ["Gojo"] = "95643163365384", ["R15 Reanimated"] = "4211223236", ["Ghost"] = "616013216", ["2016 Animation (mm2)"] = "387947975", ["(UGC) Zombie"] = "113603435314095", ["No Boundaries (Walmart)"] = "18747074203", ["Rthro"] = "10921269718", ["Werewolf"] = "1083178339", ["Wicked (Popular)"] = "92072849924640", ["Vampire"] = "1083473930", ["Popstar"] = "1212980338", ["Mage"] = "707897309", ["(UGC) Smooth"] = "76630051272791", ["R6"] = "12518152696", ["NFL"] = "110358958299415", ["Bubbly"] = "910034870", ["(UGC) Retro"] = "107806791584829", ["(UGC) Retro Zombie"] = "140703855480494", ["OldSchool"] = "10921244891", ["Elder"] = "10921111375", ["Stylish"] = "616146177", ["Stylized Female"] = "4708193840", ["Robot"] = "616095330", ["Sneaky"] = "1132510133", ["Superhero"] = "10921298616", ["Udzal"] = "3303162967", ["Toy"] = "782843345", ["Default Retarget"] = "115825677624788", ["Princess"] = "941028902", ["Cowboy"] = "1014421541"
+        ["Geto"] = "85811471336028", ["Gojo"] = "95643163365384", ["(UGC) Smooth"] = "76630051272791", ["AuraAnimationPack"] = "18747074203", ["Geto"] = "85811471336028", ["Patrol"] = "1151231493", ["Drooling Zombie"] = "3489174223", ["Adidas Community"] = "122150855457006", ["Levitation"] = "616013216", ["Catwalk Glam"] = "109168724482748", ["Knight"] = "10921127095", ["Pirate"] = "750785693", ["Bold"] = "16738340646", ["Sports (Adidas)"] = "18537392113", ["Zombie"] = "616168032", ["Astronaut"] = "891667138", ["Cartoony"] = "742640026", ["Ninja"] = "656121766", ["Confident"] = "1070017263", ["Wicked \"Dancing Through Life\""] = "73718308412641", ["Unboxed By Amazon"] = "90478085024465", ["Gojo"] = "95643163365384", ["R15 Reanimated"] = "4211223236", ["Ghost"] = "616013216", ["2016 Animation (mm2)"] = "387947975", ["(UGC) Zombie"] = "113603435314095", ["No Boundaries (Walmart)"] = "18747074203", ["Rthro"] = "10921269718", ["Werewolf"] = "1083178339", ["Wicked (Popular)"] = "92072849924640", ["Vampire"] = "1083473930", ["Popstar"] = "1212980338", ["Mage"] = "707897309", ["(UGC) Smooth"] = "76630051272791", ["R6"] = "12518152696", ["NFL"] = "110358958299415", ["Bubbly"] = "910034870", ["(UGC) Retro"] = "107806791584829", ["(UGC) Retro Zombie"] = "140703855480494", ["OldSchool"] = "10921244891", ["Elder"] = "10921111375", ["Stylish"] = "616146177", ["Stylized Female"] = "4708193840", ["Robot"] = "616095330", ["Sneaky"] = "1132510133", ["Superhero"] = "10921298616", ["Udzal"] = "3303162967", ["Toy"] = "782843345", ["Default Retarget"] = "115825677624788", ["Princess"] = "941028902", ["Cowboy"] = "1014421541"
     },
     ["Run"] = {
-        ["AuraAnimationPack"] = "18747070484", ["Robot"] = "10921250460", ["Patrol"] = "1150967949", ["Drooling Zombie"] = "3489173414", ["Adidas Community"] = "82598234841035", ["Heavy Run"] = "3236836670", ["Catwalk Glam"] = "81024476153754", ["Knight"] = "10921121197", ["Pirate"] = "750783738", ["Bold"] = "16738337225", ["Sports (Adidas)"] = "18537384940", ["Zombie"] = "616163682", ["Astronaut"] = "10921039308", ["Cartoony"] = "10921076136", ["Ninja"] = "656118852", ["(UGC) Dog"] = "130072963359721", ["Wicked \"Dancing Through Life\""] = "135515454877967", ["Unboxed By Amazon"] = "134824450619865", ["Sneaky"] = "1132494274", ["Popstar"] = "1212980348", ["Wicked (Popular)"] = "72301599441680", ["R15 Reanimated"] = "4211220381", ["Mage"] = "10921148209", ["Ghost"] = "616013216", ["Confident"] = "1070001516", ["No Boundaries (Walmart)"] = "18747070484", ["Elder"] = "10921104374", ["Werewolf"] = "10921336997", ["Stylish"] = "10921276116", ["MrToilet"] = "4417979645", ["Levitation"] = "616010382", ["OldSchool"] = "10921240218", ["Vampire"] = "10921320299", ["Bubbly"] = "10921057244", ["Superhero"] = "10921291831", ["Toy"] = "10921306285", ["Princess"] = "941015281", ["Cowboy"] = "1014401683"
+        ["Robot"] = "10921250460",
+        ["Patrol"] = "1150967949",
+        ["Drooling Zombie"] = "3489173414",
+        ["Adidas Community"] = "82598234841035",
+        ["Heavy Run (Udzal / Borock)"] = "3236836670",
+        ["Catwalk Glam"] = "81024476153754",
+        ["Knight"] = "10921121197",
+        ["Pirate"] = "750783738",
+        ["Bold"] = "16738337225",
+        ["Sports (Adidas)"] = "18537384940",
+        ["Zombie"] = "616163682",
+        ["Astronaut"] = "10921039308",
+        ["Cartoony"] = "10921076136",
+        ["Ninja"] = "656118852",
+        ["(UGC) Dog"] = "130072963359721",
+        ["Wicked \"Dancing Through Life\""] = "135515454877967",
+        ["Unboxed By Amazon"] = "134824450619865",
+        ["[UGC] Flipping"] = "124427738251511",
+        ["Sneaky"] = "1132494274",
+        ["R6"] = "12518152696",
+        ["[VOTE] Aura"] = "120142877225965",
+        ["Popstar"] = "1212980348",
+        ["[UGC] reset"] = "0",
+        ["Wicked (Popular)"] = "72301599441680",
+        ["[UGC] chibi"] = "85887415033585",
+        ["R15 Reanimated"] = "4211220381",
+        ["Mage"] = "10921148209",
+        ["Ghost"] = "616013216",
+        ["Rthro"] = "10921261968",
+        ["Confident"] = "1070001516",
+        ["Stylized Female"] = "4708192705",
+        ["No Boundaries (Walmart)"] = "18747070484",
+        ["Elder"] = "10921104374",
+        ["Werewolf"] = "10921336997",
+        ["[UGC] Girly"] = "128578785610052",
+        ["Stylish"] = "10921276116",
+        ["(UGC) Pride"] = "116462200642360",
+        ["NFL"] = "117333533048078",
+        ["(UGC) Soccer"] = "116881956670910",
+        ["MrToilet"] = "4417979645",
+        ["[VOTE] Float"] = "71267457613791",
+        ["Levitation"] = "616010382",
+        ["(UGC) Retro"] = "107806791584829",
+        ["(UGC) Retro Zombie"] = "140703855480494",
+        ["OldSchool"] = "10921240218",
+        ["Vampire"] = "10921320299",
+        ["furry"] = "102269417125238",
+        ["Bubbly"] = "10921057244",
+        ["fake wicked"] = "138992096476836",
+        ["2016 Animation (mm2)"] = "387947975",
+        ["[UGC] ball"] = "132499588684957",
+        ["Superhero"] = "10921291831",
+        ["Toy"] = "10921306285",
+        ["Default Retarget"] = "102294264237491",
+        ["Princess"] = "941015281",
+        ["Cowboy"] = "1014401683"
     },
     ["Jump"] = {
-        ["AuraAnimationPack"] = "507765000", ["Robot"] = "616090535", ["Patrol"] = "1148811837", ["Levitation"] = "616008936", ["Knight"] = "910016857", ["Pirate"] = "750782230", ["Bold"] = "16738336650", ["Zombie"] = "616161997", ["Astronaut"] = "891627522", ["Cartoony"] = "742637942", ["Ninja"] = "656117878", ["Confident"] = "1069984524", ["R15 Reanimated"] = "4211219390", ["Werewolf"] = "1083218792", ["Mage"] = "10921149743", ["Sneaky"] = "1132489853", ["Superhero"] = "10921294559", ["Elder"] = "10921107367", ["OldSchool"] = "10921242013", ["Stylish"] = "616139451", ["Vampire"] = "1083455352", ["Toy"] = "10921308158", ["Princess"] = "941008832"
+        ["Robot"] = "616090535",
+        ["Patrol"] = "1148811837",
+        ["Adidas Community"] = "75290611992385",
+        ["Levitation"] = "616008936",
+        ["Catwalk Glam"] = "116936326516985",
+        ["Knight"] = "910016857",
+        ["Pirate"] = "750782230",
+        ["Bold"] = "16738336650",
+        ["Sports (Adidas)"] = "18537380791",
+        ["Zombie"] = "616161997",
+        ["Astronaut"] = "891627522",
+        ["Cartoony"] = "742637942",
+        ["Ninja"] = "656117878",
+        ["Confident"] = "1069984524",
+        ["Wicked \"Dancing Through Life\""] = "78508480717326",
+        ["Unboxed By Amazon"] = "121454505477205",
+        ["R6"] = "12520880485",
+        ["R15 Reanimated"] = "4211219390",
+        ["Ghost"] = "616008936",
+        ["Rthro"] = "10921263860",
+        ["No Boundaries (Walmart)"] = "18747069148",
+        ["Werewolf"] = "1083218792",
+        ["Cowboy"] = "1014394726",
+        ["UGC"] = "91788124131212",
+        ["[VOTE] Animal"] = "131203832825082",
+        ["Popstar"] = "1212954642",
+        ["Mage"] = "10921149743",
+        ["Sneaky"] = "1132489853",
+        ["Superhero"] = "10921294559",
+        ["Elder"] = "10921107367",
+        ["(UGC) Retro"] = "139390570947836",
+        ["NFL"] = "119846112151352",
+        ["OldSchool"] = "10921242013",
+        ["Stylized Female"] = "4708188025",
+        ["Stylish"] = "616139451",
+        ["Bubbly"] = "910016857",
+        ["[VOTE] Float"] = "75611679208549",
+        ["[VOTE] Aura"] = "93382302369459",
+        ["Vampire"] = "1083455352",
+        ["Wicked (Popular)"] = "104325245285198",
+        ["Toy"] = "10921308158",
+        ["Default Retarget"] = "117150377950987",
+        ["Princess"] = "941008832",
+        ["[UGC] happy"] = "72388373557525"
     },
     ["Fall"] = {
-        ["Robot"] = "616087089", ["Patrol"] = "1148863382", ["Levitation"] = "616005863", ["Pirate"] = "750780242", ["Zombie"] = "616157476", ["Astronaut"] = "891617961", ["Cartoony"] = "742637151", ["Ninja"] = "656115606", ["Confident"] = "1069973677", ["R15 Reanimated"] = "4211216152", ["Werewolf"] = "1083189019", ["Mage"] = "707829716", ["OldSchool"] = "10921241244", ["Sneaky"] = "1132469004", ["Elder"] = "10921105765", ["Bubbly"] = "910001910", ["Vampire"] = "1083443587", ["Superhero"] = "10921293373", ["Toy"] = "782846423", ["Princess"] = "941000007", ["Cowboy"] = "1014384571"
-    },
+        ["Robot"] = "616087089",
+        ["Patrol"] = "1148863382",
+        ["Adidas Community"] = "98600215928904",
+        ["Levitation"] = "616005863",
+        ["Catwalk Glam"] = "92294537340807",
+        ["Knight"] = "10921122579",
+        ["Pirate"] = "750780242",
+        ["Bold"] = "16738333171",
+        ["Sports (Adidas)"] = "18537367238",
+        ["Zombie"] = "616157476",
+        ["Astronaut"] = "891617961",
+        ["Cartoony"] = "742637151",
+        ["Ninja"] = "656115606",
+        ["Confident"] = "1069973677",
+        ["Wicked \"Dancing Through Life\""] = "78147885297412",
+        ["Unboxed By Amazon"] = "94788218468396",
+        ["R6"] = "12520972571",
+        ["[UGC] skydiving"] = "102674302534126",
+        ["R15 Reanimated"] = "4211216152",
+        ["Rthro"] = "10921262864",
+        ["No Boundaries (Walmart)"] = "18747062535",
+        ["Werewolf"] = "1083189019",
+        ["[VOTE] TPose"] = "139027266704971",
+        ["Mage"] = "707829716",
+        ["[VOTE] Animal"] = "77069224396280",
+        ["Wicked (Popular)"] = "121152442762481",
+        ["Popstar"] = "1212900995",
+        ["NFL"] = "129773241321032",
+        ["OldSchool"] = "10921241244",
+        ["Sneaky"] = "1132469004",
+        ["Elder"] = "10921105765",
+        ["Bubbly"] = "910001910",
+        ["Stylish"] = "616134815",
+        ["Stylized Female"] = "4708186162",
+        ["Vampire"] = "1083443587",
+        ["Superhero"] = "10921293373",
+        ["Toy"] = "782846423",
+        ["Default Retarget"] = "110205622518029",
+        ["Princess"] = "941000007",
+        ["Cowboy"] = "1014384571"
+	},
+	["SwimIdle"] = {
+        ["Sneaky"] = "1132506407",
+        ["SuperHero"] = "10921297391",
+        ["Adidas Community"] = "109346520324160",
+        ["Levitation"] = "10921139478",
+        ["Catwalk Glam"] = "98854111361360",
+        ["Knight"] = "10921125935",
+        ["Pirate"] = "750785176",
+        ["Bold"] = "16738339817",
+        ["Sports (Adidas)"] = "18537387180",
+        ["Stylized"] = "4708190607",
+        ["Astronaut"] = "891663592",
+        ["Cartoony"] = "10921079380",
+        ["Wicked (Popular)"] = "113199415118199",
+        ["Mage"] = "707894699",
+        ["Wicked \"Dancing Through Life\""] = "129183123083281",
+        ["Unboxed By Amazon"] = "129126268464847",
+        ["R6"] = "12518152696",
+        ["Rthro"] = "10921265698",
+        ["CowBoy"] = "1014411816",
+        ["No Boundaries (Walmart)"] = "18747071682",
+        ["Werewolf"] = "10921341319",
+        ["NFL"] = "79090109939093",
+        ["OldSchool"] = "10921244018",
+        ["Robot"] = "10921253767",
+        ["Elder"] = "10921110146",
+        ["Bubbly"] = "910030921",
+        ["Patrol"] = "1151221899",
+        ["Vampire"] = "10921325443",
+        ["Popstar"] = "1212998578",
+        ["Ninja"] = "656118341",
+        ["Toy"] = "10921310341",
+        ["Confident"] = "1070012133",
+        ["Princess"] = "941025398",
+        ["Stylish"] = "10921281964"
+	},	
     ["Swim"] = {
-        ["Sneaky"] = "1132500520", ["Patrol"] = "1151204998", ["Levitation"] = "10921138209", ["Knight"] = "10921125160", ["Pirate"] = "750784579", ["Zombie"] = "616165109", ["Mage"] = "707876443", ["Werewolf"] = "10921340419", ["OldSchool"] = "10921243048", ["Elder"] = "10921108971", ["Vampire"] = "10921324408", ["Toy"] = "10921309319", ["SuperHero"] = "10921295495"
+        ["Sneaky"] = "1132500520",
+        ["Patrol"] = "1151204998",
+        ["Adidas Community"] = "133308483266208",
+        ["Levitation"] = "10921138209",
+        ["Catwalk Glam"] = "134591743181628",
+        ["Knight"] = "10921125160",
+        ["Pirate"] = "750784579",
+        ["Bold"] = "16738339158",
+        ["Sports (Adidas)"] = "18537389531",
+        ["Zombie"] = "616165109",
+        ["Astronaut"] = "891663592",
+        ["Cartoony"] = "10921079380",
+        ["Wicked (Popular)"] = "99384245425157",
+        ["Mage"] = "707876443",
+        ["PopStar"] = "1212998578",
+        ["Unboxed By Amazon"] = "105962919001086",
+        ["R6"] = "12518152696",
+        ["[VOTE] Boat"] = "85689117221382",
+        ["Rthro"] = "10921264784",
+        ["CowBoy"] = "1014406523",
+        ["No Boundaries (Walmart)"] = "18747073181",
+        ["Werewolf"] = "10921340419",
+        ["NFL"] = "132697394189921",
+        ["OldSchool"] = "10921243048",
+        ["Wicked \"Dancing Through Life\""] = "110657013921774",
+        ["Elder"] = "10921108971",
+        ["Bubbly"] = "910028158",
+        ["Robot"] = "10921253142",
+        ["[VOTE] Aura"] = "80645586378736",
+        ["Vampire"] = "10921324408",
+        ["Stylish"] = "10921281000",
+        ["Toy"] = "10921309319",
+        ["SuperHero"] = "10921295495",
+        ["Princess"] = "941018893",
+        ["Confident"] = "1070009914"
     },
     ["Climb"] = {
-        ["Robot"] = "616086039", ["Patrol"] = "1148811837", ["Levitation"] = "10921132092", ["Bold"] = "16738332169", ["Zombie"] = "616156119", ["Astronaut"] = "10921032124", ["Cartoony"] = "742636889", ["Ninja"] = "656114359", ["Confident"] = "1069946257", ["Mage"] = "707826056", ["OldSchool"] = "10921229866", ["Sneaky"] = "1132461372", ["Elder"] = "845392038", ["SuperHero"] = "10921286911", ["WereWolf"] = "10921329322", ["Vampire"] = "1083439238", ["Toy"] = "10921300839"
+        ["Robot"] = "616086039",
+        ["Patrol"] = "1148811837",
+        ["Adidas Community"] = "88763136693023",
+        ["Levitation"] = "10921132092",
+        ["Catwalk Glam"] = "119377220967554",
+        ["Knight"] = "10921125160",
+        ["[VOTE] Animal"] = "124810859712282",
+        ["Bold"] = "16738332169",
+        ["Sports (Adidas)"] = "18537363391",
+        ["Zombie"] = "616156119",
+        ["Astronaut"] = "10921032124",
+        ["Cartoony"] = "742636889",
+        ["Ninja"] = "656114359",
+        ["Confident"] = "1069946257",
+        ["Wicked \"Dancing Through Life\""] = "129447497744818",
+        ["Unboxed By Amazon"] = "121145883950231",
+        ["R6"] = "12520982150",
+        ["Ghost"] = "616003713",
+        ["Rthro"] = "10921257536",
+        ["CowBoy"] = "1014380606",
+        ["No Boundaries (Walmart)"] = "18747060903",
+        ["Mage"] = "707826056",
+        ["[VOTE] sticky"] = "77520617871799",
+        ["Reanimated R15"] = "4211214992",
+        ["Popstar"] = "1213044953",
+        ["(UGC) Retro"] = "121075390792786",
+        ["NFL"] = "134630013742019",
+        ["OldSchool"] = "10921229866",
+        ["Sneaky"] = "1132461372",
+        ["Elder"] = "845392038",
+        ["Stylized Female"] = "4708184253",
+        ["Stylish"] = "10921271391",
+        ["SuperHero"] = "10921286911",
+        ["WereWolf"] = "10921329322",
+        ["Vampire"] = "1083439238",
+        ["Toy"] = "10921300839",
+        ["Wicked (Popular)"] = "131326830509784",
+        ["Princess"] = "940996062",
+        ["[VOTE] Rope"] = "134977367563514"
     }
 }
 
@@ -622,39 +1031,27 @@ end
 
 local function ResetToDefaultAnimations()
     local char = player.Character
-    local animate = char and char:FindFirstChild("Animate")
-    local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+    if not char then return end
+    
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    local animate = char:FindFirstChild("Animate")
 
-    if animate and humanoid then
-        -- 1. Kosongkan memori SavedAnimations agar tidak otomatis terpasang lagi
-        for k, v in pairs(SavedAnimations) do SavedAnimations[k] = nil end
-
-        -- 2. Buat klon bersih
-        local animateClone = animate:Clone()
-        local folders = {"idle", "walk", "run", "jump", "fall", "climb", "swim"}
-        
-        for _, name in pairs(folders) do
-            local f = animateClone:FindFirstChild(name)
-            if f then f:ClearAllChildren() end
-        end
-
-        -- 3. Ganti script Animate ke kondisi Default
-        animate:Destroy()
-        for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do track:Stop(0) end
-        task.wait(0.1)
-        animateClone.Parent = char
-        
-        -- 4. Paksa update state
-        humanoid:ChangeState(Enum.HumanoidStateType.Jump)
-        task.wait(0.1)
-        humanoid:ChangeState(Enum.HumanoidStateType.Landing)
-
-        ShowNotification("Animations Reset to Default!")
+    -- 1. Kosongkan memori SavedAnimations agar tidak otomatis terpasang lagi saat respawn
+    for k, v in pairs(SavedAnimations) do 
+        SavedAnimations[k] = nil 
     end
+
+    -- 2. RESET TOTAL: Menggunakan LoadCharacter
+    -- Ini adalah satu-satunya cara paling stabil di Roblox untuk mengembalikan 
+    -- semua animasi bundle (Ninja, Mage, Old School, dll) secara instan.
+    player:LoadCharacter()
+    
+    -- Notifikasi Sukses
+    ShowNotification("Animations Reset to Avatar Default!")
 end
 
 -- Urutan Tampilan
-local CategoryOrder = {"Idle", "Walk", "Run", "Jump", "Fall", "Climb", "Swim"}
+local CategoryOrder = {"Idle", "Walk", "Run", "Jump", "Fall", "Climb","Swim Idle", "Swim"}
 
 -- 3. Fungsi Pembuat Baris Kategori
 local function CreateAnimCategory(categoryName, data, order)
@@ -1265,7 +1662,7 @@ followBtn.MouseButton1Click:Connect(function()
     end
 end)
 
---- --- 🔹 ISI TAB MOVEMENT 🔹 --- ---
+-- --- 🔹 ISI TAB MOVEMENT 🔹 ---
 local function CreateMovementSetting(name, min, max, default, callback)
     local container = Instance.new("Frame")
     container.Parent = movementTabFrame
@@ -1290,7 +1687,7 @@ local function CreateMovementSetting(name, min, max, default, callback)
     input.Text = tostring(default)
     input.TextColor3 = Color3.fromRGB(0, 255, 0)
     input.Font = Enum.Font.GothamBold
-    input.PlaceholderText = "Enter value..."
+    input.PlaceholderText = "Input angka..."
     Instance.new("UICorner", input).CornerRadius = UDim.new(0, 6)
 
     input.FocusLost:Connect(function(enter)
@@ -1304,21 +1701,24 @@ local function CreateMovementSetting(name, min, max, default, callback)
     end)
 end
 
--- Walk Speed
+-- 1. Walk Speed
 CreateMovementSetting("Walk Speed", 0, 500, 16, function(v)
-    player.Character.Humanoid.WalkSpeed = v
+    if player.Character and player.Character:FindFirstChild("Humanoid") then
+        player.Character.Humanoid.WalkSpeed = v
+    end
 end)
 
--- Jump Power
+-- 2. Jump Power
 CreateMovementSetting("Jump Power", 0, 500, 50, function(v)
-    player.Character.Humanoid.UseJumpPower = true
-    player.Character.Humanoid.JumpPower = v
+    if player.Character and player.Character:FindFirstChild("Humanoid") then
+        player.Character.Humanoid.UseJumpPower = true
+        player.Character.Humanoid.JumpPower = v
+    end
 end)
 
--- Fly Speed (Mengatur variabel lokal untuk Fly jika kamu punya script fly)
-local flySpeedValue = 50
+-- 3. Fly Speed (Sinkron dengan variabel FlySpeed)
 CreateMovementSetting("Fly Speed", 0, 1000, 50, function(v)
-    flySpeedValue = v
+    FlySpeed = v -- Sekarang slider ini merubah variabel FlySpeed global
     ShowNotification("Fly Speed set to: " .. v)
 end)
 
@@ -1416,6 +1816,7 @@ local FlySpeed = 50
 local BodyGyro, BodyVelocity
 local FlyConnection
 
+-- --- 🔹 INTEGRASI LOGIKA FLY (SystemBroken Mode) 🔹 ---
 local function StartFlying()
     local char = player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -1424,7 +1825,6 @@ local function StartFlying()
 
     Flying = true
     
-    -- Menggunakan BodyGyro & BodyVelocity sesuai logika SystemBroken
     BodyGyro = Instance.new("BodyGyro", root)
     BodyGyro.P = 9e4
     BodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
@@ -1434,7 +1834,6 @@ local function StartFlying()
     BodyVelocity.Velocity = Vector3.new(0, 0, 0)
     BodyVelocity.MaxForce = Vector3.new(9e9, 9e9, 9e9)
 
-    -- Loop pergerakan halus (RunService) dari SystemBroken
     FlyConnection = RunService.RenderStepped:Connect(function()
         if Flying and root and hum.Parent then
             local camera = workspace.CurrentCamera
@@ -1446,9 +1845,10 @@ local function StartFlying()
             if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - camera.CFrame.RightVector end
             if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + camera.CFrame.RightVector end
             
+            -- PENGGUNAAN VARIABEL FLYSPEED YANG SUDAH DIUPDATE SLIDER
             BodyVelocity.Velocity = moveDir * FlySpeed
             BodyGyro.CFrame = camera.CFrame
-            hum.PlatformStand = true -- Mematikan animasi agar tidak goyang (Sama seperti SystemBroken)
+            hum.PlatformStand = true 
         end
     end)
 end
@@ -1549,5 +1949,39 @@ if movementTabFrame then
                 avaLightBtn.TextColor3 = AvaLightActive and Color3.fromRGB(0, 0, 0) or Color3.fromRGB(255, 255, 255)
             end
         end
+    end)
+end
+
+--- --- 🔹 SINGLE RESPOND SYSTEM (REPLACER) 🔹 --- ---
+-- Hapus semua Player.CharacterAdded yang lain, cukup pakai yang ini:
+
+local function CleanReapply(char)
+    -- 1. Tunggu Humanoid & Animate benar-benar masuk ke Workspace
+    local hum = char:WaitForChild("Humanoid", 10)
+    local animScript = char:WaitForChild("Animate", 10)
+    
+    if hum and animScript then
+        -- 2. Jeda yang lebih aman (Roblox butuh waktu untuk inisialisasi internal)
+        task.wait(1.5) 
+        
+        -- 3. Pasang ulang semua yang tersimpan
+        for category, data in pairs(SavedAnimations) do
+            if data then
+                -- Kita panggil fungsinya dengan task.spawn agar tidak saling tunggu
+                task.spawn(function()
+                    ApplyInstantAnimation(category, data)
+                end)
+            end
+        end
+    end
+end
+
+-- Hanya satu koneksi agar tidak bentrok
+player.CharacterAdded:Connect(CleanReapply)
+
+-- Jalankan untuk karakter pertama kali load
+if player.Character then
+    task.spawn(function()
+        CleanReapply(player.Character)
     end)
 end
