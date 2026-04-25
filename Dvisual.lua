@@ -1051,7 +1051,7 @@ local function ResetToDefaultAnimations()
 end
 
 -- Urutan Tampilan
-local CategoryOrder = {"Idle", "Walk", "Run", "Jump", "Fall", "Climb","Swim Idle", "Swim"}
+local CategoryOrder = {"Idle", "Walk", "Run", "Jump", "Fall", "Climb","SwimIdle", "Swim"}
 
 -- 3. Fungsi Pembuat Baris Kategori
 local function CreateAnimCategory(categoryName, data, order)
