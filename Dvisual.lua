@@ -168,7 +168,7 @@ title.Parent = main
 title.Size = UDim2.new(1, -100, 0, 45)
 title.Position = UDim2.new(0, 15, 0, 0)
 title.BackgroundTransparency = 1
-title.Text = "🔥 Dvisual UI"
+title.Text = "🔥 Dvisual by Udin"
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 18
@@ -655,6 +655,7 @@ mainListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
 local AnimationData = {
     ["Idle"] = {
+		["Katseye"] = {"108187809145790", "72329200359275"},
 		["Glow Motion"] = {"137764781910579", "96439737641086"},
 		["Adidas Aura"] = {"110211186840347", "114191137265065"},
 		["AuraAnimationPack"] = {"18747067405", "507766666"},
@@ -728,10 +729,11 @@ local AnimationData = {
         ["Unboxed By Amazon"] = {"98281136301627", "138183121662404"}
     },
     ["Walk"] = {
-        ["Glow Motion"] = "85809016093530", ["Adidas Aura"] = "83842218823011", ["Geto"] = "85811471336028", ["Gojo"] = "95643163365384", ["(UGC) Smooth"] = "76630051272791", ["AuraAnimationPack"] = "18747074203", ["Geto"] = "85811471336028", ["Patrol"] = "1151231493", ["Drooling Zombie"] = "3489174223", ["Adidas Community"] = "122150855457006", ["Levitation"] = "616013216", ["Catwalk Glam"] = "109168724482748", ["Knight"] = "10921127095", ["Pirate"] = "750785693", ["Bold"] = "16738340646", ["Sports (Adidas)"] = "18537392113", ["Zombie"] = "616168032", ["Astronaut"] = "891667138", ["Cartoony"] = "742640026", ["Ninja"] = "656121766", ["Confident"] = "1070017263", ["Wicked \"Dancing Through Life\""] = "73718308412641", ["Unboxed By Amazon"] = "90478085024465", ["Gojo"] = "95643163365384", ["R15 Reanimated"] = "4211223236", ["Ghost"] = "616013216", ["2016 Animation (mm2)"] = "387947975", ["(UGC) Zombie"] = "113603435314095", ["No Boundaries (Walmart)"] = "18747074203", ["Rthro"] = "10921269718", ["Werewolf"] = "1083178339", ["Wicked (Popular)"] = "92072849924640", ["Vampire"] = "1083473930", ["Popstar"] = "1212980338", ["Mage"] = "707897309", ["(UGC) Smooth"] = "76630051272791", ["R6"] = "12518152696", ["NFL"] = "110358958299415", ["Bubbly"] = "910034870", ["(UGC) Retro"] = "107806791584829", ["(UGC) Retro Zombie"] = "140703855480494", ["OldSchool"] = "10921244891", ["Elder"] = "10921111375", ["Stylish"] = "616146177", ["Stylized Female"] = "4708193840", ["Robot"] = "616095330", ["Sneaky"] = "1132510133", ["Superhero"] = "10921298616", ["Udzal"] = "3303162967", ["Toy"] = "782843345", ["Default Retarget"] = "115825677624788", ["Princess"] = "941028902", ["Cowboy"] = "1014421541"
+        ["Katseye"] = "99182913548783", ["Glow Motion"] = "85809016093530", ["Adidas Aura"] = "83842218823011", ["Geto"] = "85811471336028", ["Gojo"] = "95643163365384", ["(UGC) Smooth"] = "76630051272791", ["AuraAnimationPack"] = "18747074203", ["Geto"] = "85811471336028", ["Patrol"] = "1151231493", ["Drooling Zombie"] = "3489174223", ["Adidas Community"] = "122150855457006", ["Levitation"] = "616013216", ["Catwalk Glam"] = "109168724482748", ["Knight"] = "10921127095", ["Pirate"] = "750785693", ["Bold"] = "16738340646", ["Sports (Adidas)"] = "18537392113", ["Zombie"] = "616168032", ["Astronaut"] = "891667138", ["Cartoony"] = "742640026", ["Ninja"] = "656121766", ["Confident"] = "1070017263", ["Wicked \"Dancing Through Life\""] = "73718308412641", ["Unboxed By Amazon"] = "90478085024465", ["Gojo"] = "95643163365384", ["R15 Reanimated"] = "4211223236", ["Ghost"] = "616013216", ["2016 Animation (mm2)"] = "387947975", ["(UGC) Zombie"] = "113603435314095", ["No Boundaries (Walmart)"] = "18747074203", ["Rthro"] = "10921269718", ["Werewolf"] = "1083178339", ["Wicked (Popular)"] = "92072849924640", ["Vampire"] = "1083473930", ["Popstar"] = "1212980338", ["Mage"] = "707897309", ["(UGC) Smooth"] = "76630051272791", ["R6"] = "12518152696", ["NFL"] = "110358958299415", ["Bubbly"] = "910034870", ["(UGC) Retro"] = "107806791584829", ["(UGC) Retro Zombie"] = "140703855480494", ["OldSchool"] = "10921244891", ["Elder"] = "10921111375", ["Stylish"] = "616146177", ["Stylized Female"] = "4708193840", ["Robot"] = "616095330", ["Sneaky"] = "1132510133", ["Superhero"] = "10921298616", ["Udzal"] = "3303162967", ["Toy"] = "782843345", ["Default Retarget"] = "115825677624788", ["Princess"] = "941028902", ["Cowboy"] = "1014421541"
     },
     ["Run"] = {
-		["Glow Motion	"] = "101925097435036",
+		["Katseye"] = "73117360545482",
+		["Glow Motion"] = "101925097435036",
 		["Adidas Aura"] = "118320322718866",
         ["Robot"] = "10921250460",
         ["Patrol"] = "1150967949",
@@ -791,6 +793,7 @@ local AnimationData = {
         ["Cowboy"] = "1014401683"
     },
     ["Jump"] = {
+		["Katseye"] = "103632305262747",
 		["Glow Motion	"] = "74159004634379",
 		["Adidas Aura"] = "109996626521204",
         ["Robot"] = "616090535",
@@ -839,6 +842,7 @@ local AnimationData = {
         ["[UGC] happy"] = "72388373557525"
     },
     ["Fall"] = {
+		["Katseye"] = "127802717128367",
 		["Glow Motion	"] = "98070939608691",
 		["Adidas Aura"] = "95603166884636",
         ["Robot"] = "616087089",
@@ -883,6 +887,7 @@ local AnimationData = {
         ["Cowboy"] = "1014384571"
 	},
 	["SwimIdle"] = {
+		["Katseye"] = "138619485942849",
 		["Glow Motion	"] = "112946194103503",
 		["Adidas Aura"] = "94922130551805",
         ["Sneaky"] = "1132506407",
@@ -960,6 +965,7 @@ local AnimationData = {
         ["Confident"] = "1070009914"
     },
     ["Climb"] = {
+		["Katseye"] = "106213237973858",
 		["Glow Motion	"] = "108236155509584",
 		["Adidas Aura"] = "97824616490448",
         ["Robot"] = "616086039",
