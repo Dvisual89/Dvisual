@@ -372,6 +372,11 @@ AddScriptButton("Animate SPy", function()
     ShowNotification("Animation Executed!")
 end)
 
+AddScriptButton("Sky Changer", function()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/Dvisual89/Dvisual/refs/heads/main/skybox.lua"))()
+    ShowNotification("Animation Executed!")
+end)
+
 AddScriptButton("Bring Coil", function()
     loadstring(game:HttpGet("https://gist.githubusercontent.com/Ahma174/4e504a62e822daa3039192afa9752713/raw/8ff97c8f86d016ef9ad719f03c3aaf0ccc897bd1/gistfile1.txt"))()
     ShowNotification("Animation Executed!")
