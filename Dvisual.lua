@@ -44,68 +44,6 @@ local function ApplyDesign(obj, radius, trans)
     if trans then obj.BackgroundTransparency = trans end
 end
 
---- --- 🔹 FUNGSI APPLY UNIVERSAL (VERSI PERBAIKAN) 🔹 --- ---
-local function ApplyInstantAnimation(category, data)
-    if not data then return end
-    local char = player.Character
-    local animate = char and char:FindFirstChild("Animate")
-    local humanoid = char and char:FindFirstChildOfClass("Humanoid")
-    
-    if animate and humanoid then
-        -- Simpan pilihan agar tidak hilang saat pindah map
-        SavedAnimations[category] = data
-        
-        -- Sesuaikan nama folder (Idle -> idle, Walk -> walk, dll)
-        local folderName = category == "Idle" and "idle" or category:lower()
-        local targetFolder = animate:FindFirstChild(folderName)
-        
-        if targetFolder then
-            -- Buat klon dari script Animate untuk me-refresh total sistem animasi
-            local animateClone = animate:Clone()
-            local cloneFolder = animateClone:FindFirstChild(folderName)
-            
-            -- Bersihkan isi folder animasi yang lama di dalam klon
-            cloneFolder:ClearAllChildren()
-            
-            -- Tentukan nama objek (Penting: Jump dan Fall punya nama khusus di Roblox)
-            local animName = "Animation1"
-            if folderName == "jump" then animName = "JumpAnim"
-            elseif folderName == "fall" then animName = "FallAnim" end
-
-            -- Fungsi pembantu membuat objek Animation dan StringValue (Wajib ada keduanya)
-            local function CreateEntry(id, name, parent)
-                local a = Instance.new("Animation")
-                a.Name = name; a.AnimationId = "rbxassetid://"..id; a.Parent = parent
-                local v = Instance.new("StringValue")
-                v.Name = name; v.Parent = parent
-            end
-
-            -- Masukkan ID baru ke dalam klon
-            if type(data) == "table" then
-                for i, id in ipairs(data) do
-                    CreateEntry(id, (i == 1 and animName) or ("Animation"..i), cloneFolder)
-                end
-            else
-                CreateEntry(data, animName, cloneFolder)
-            end
-
-            -- Hancurkan script lama, hentikan semua animasi yang sedang jalan, dan pasang yang baru
-            animate:Destroy()
-            for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do track:Stop(0) end
-            animateClone.Parent = char
-            
-            -- Paksa refresh fisika karakter agar Walk/Run langsung berubah
-            local s = humanoid.WalkSpeed
-            humanoid.WalkSpeed = 0
-            task.wait(0.05)
-            humanoid.WalkSpeed = s
-            humanoid:ChangeState(Enum.HumanoidStateType.Running)
-            
-            ShowNotification(category .. " Applied!")
-        end
-    end
-end
-
 local gui = Instance.new("ScreenGui")
 gui.Name = "DvisualUI_Final" -- Nama ini harus sama dengan pengecekan di atas
 gui.Parent = game:GetService("CoreGui")
@@ -509,48 +447,6 @@ copyAvaBtn.MouseButton1Click:Connect(function()
         end
     end
 end)
-
---- --- 🔹 SISTEM ANIMASI UNIVERSAL 🔹 --- ---
-
-local function ApplyInstantAnimation(category, data)
-    local char = player.Character
-    local animScript = char and char:FindFirstChild("Animate")
-    if not animScript then return end
-
-    -- Menyamakan nama kategori dengan nama folder di dalam script 'Animate'
-    local folderName = category:lower()
-    if folderName == "swimidle" then folderName = "swimidle" end
-    
-    local targetFolder = animScript:FindFirstChild(folderName)
-    if targetFolder then
-        -- Cek apakah data itu tabel {"123", "456"} atau cuma teks "789"
-        if type(data) == "table" then
-            if targetFolder:FindFirstChild("Animation1") then
-                targetFolder.Animation1.AnimationId = "rbxassetid://" .. data[1]
-            end
-            if targetFolder:FindFirstChild("Animation2") and data[2] then
-                targetFolder.Animation2.AnimationId = "rbxassetid://" .. data[2]
-            end
-        else
-            -- Jika data cuma satu ID (string)
-            if targetFolder:FindFirstChild("Animation1") then
-                targetFolder.Animation1.AnimationId = "rbxassetid://" .. data
-            end
-        end
-
-        -- Refresh karakter agar animasi langsung berubah
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        if hum then
-            for _, track in pairs(hum:GetPlayingAnimationTracks()) do 
-                track:Stop(0) 
-            end
-            animScript.Disabled = true
-            task.wait(0.05)
-            animScript.Disabled = false
-            ShowNotification(category .. " Applied!")
-        end
-    end
-end
 
 --- --- 🔹 ISI TAB ANIMATION (SCROLLING SYSTEM) 🔹 --- ---
 
@@ -964,12 +860,29 @@ local function ApplyInstantAnimation(category, data)
             end
 
             if type(data) == "table" then
-                for i, id in ipairs(data) do
-                    CreateEntry(id, (i == 1 and animName) or ("Animation"..i), targetFolder)
-                end
-            else
-                CreateEntry(data, animName, targetFolder)
-            end
+				for i, id in ipairs(data) do
+					CreateEntry(id, (i == 1 and animName) or ("Animation"..i), targetFolder)
+				end
+			else
+				CreateEntry(data, animName, targetFolder)
+			end
+
+			-- POINT 3 & 4 TARUH DI SINI
+			if folderName == "idle" then
+				if targetFolder:FindFirstChild("Animation1") then
+					local w1 = Instance.new("NumberValue")
+					w1.Name = "Weight"
+					w1.Value = 9
+					w1.Parent = targetFolder.Animation1
+				end
+
+				if targetFolder:FindFirstChild("Animation2") then
+					local w2 = Instance.new("NumberValue")
+					w2.Name = "Weight"
+					w2.Value = 1
+					w2.Parent = targetFolder.Animation2
+				end
+			end
 
             -- Hancurkan yang lama dan pasang yang baru (Nuclear Refresh)
             animate:Destroy()
