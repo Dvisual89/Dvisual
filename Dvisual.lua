@@ -218,7 +218,6 @@ local avatarTabFrame = CreateTabFrame("Avatar", false)
 local animTabFrame = CreateTabFrame("Animation", false) 
 local characterTabFrame = CreateTabFrame("Character", false)
 local movementTabFrame = CreateTabFrame("Movement", false)
-local catalogTabFrame = CreateTabFrame("Catalog", false)-- Tambahkan ini
 
 local function showTab(tabName)
     infoTabFrame.Visible = (tabName == "Info")
@@ -227,7 +226,6 @@ local function showTab(tabName)
 	animTabFrame.Visible = (tabName == "Animation") 
 	characterTabFrame.Visible = (tabName == "Character")
 	movementTabFrame.Visible = (tabName == "Movement")
-	catalogTabFrame.Visible = (tabName == "Catalog") -- Tambahkan ini
 end
 
 local function CreateTabBtn(icon, label, name, hasSeparator)
@@ -261,7 +259,6 @@ CreateTabBtn("👤", "Info", "Info", true)
 CreateTabBtn("🏠", "Main", "Home", true)
 CreateTabBtn("👕", "Avatar", "Avatar", false)
 CreateTabBtn("🏃", "Animation", "Animation", false) 
-CreateTabBtn("🗂️", "Catalog", "Catalog", false) -- Tambahkan Button Catalog di sini
 CreateTabBtn("", "Character", "Character", false)
 CreateTabBtn("⚡", "Move", "Movement", false)-- Tambahkan ini
 
@@ -511,98 +508,6 @@ copyAvaBtn.MouseButton1Click:Connect(function()
             end
         end
     end
-end)
-
---- --- 🔹 ISI TAB CATALOG (PRO LIST) 🔹 --- ---
-
--- Container Utama untuk List (Scrolling)
-local catalogListFrame = Instance.new("ScrollingFrame")
-catalogListFrame.Parent = catalogTabFrame
-catalogListFrame.Size = UDim2.new(1, 0, 1, -45) -- Sisakan ruang untuk tombol reset di bawah
-catalogListFrame.BackgroundTransparency = 1
-catalogListFrame.ScrollBarThickness = 2
-catalogListFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-
-local listLayout = Instance.new("UIListLayout")
-listLayout.Parent = catalogListFrame
-listLayout.Padding = UDim.new(0, 5)
-listLayout.SortOrder = Enum.SortOrder.Name
-
--- Fungsi untuk Membuat Baris Pemain
-local function CreatePlayerRow(p)
-    if p == player then return end -- Jangan munculkan diri sendiri
-
-    local row = Instance.new("Frame")
-    row.Name = p.Name
-    row.Size = UDim2.new(1, -5, 0, 45)
-    row.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-    row.BackgroundTransparency = 0.5
-    row.Parent = catalogListFrame
-    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 6)
-
-    local pName = Instance.new("TextLabel")
-    pName.Size = UDim2.new(0.7, 0, 0.5, 0)
-    pName.Position = UDim2.new(0, 10, 0, 5)
-    pName.Text = p.DisplayName
-    pName.TextColor3 = Color3.new(1, 1, 1)
-    pName.Font = Enum.Font.GothamBold
-    pName.TextSize = 12
-    pName.TextXAlignment = Enum.TextXAlignment.Left
-    pName.BackgroundTransparency = 1
-    pName.Parent = row
-
-    local pUser = Instance.new("TextLabel")
-    pUser.Size = UDim2.new(0.7, 0, 0.4, 0)
-    pUser.Position = UDim2.new(0, 10, 0.5, 2)
-    pUser.Text = "@" .. p.Name
-    pUser.TextColor3 = Color3.fromRGB(180, 180, 180)
-    pUser.Font = Enum.Font.Gotham
-    pUser.TextSize = 10
-    pUser.TextXAlignment = Enum.TextXAlignment.Left
-    pUser.BackgroundTransparency = 1
-    pUser.Parent = row
-
-    local stealBtn = Instance.new("TextButton")
-    stealBtn.Size = UDim2.new(0, 60, 0, 25)
-    stealBtn.Position = UDim2.new(1, -70, 0.5, -12)
-    stealBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
-    stealBtn.Text = "STEAL"
-    stealBtn.TextColor3 = Color3.new(1, 1, 1)
-    stealBtn.Font = Enum.Font.GothamBold
-    stealBtn.TextSize = 10
-    stealBtn.Parent = row
-    Instance.new("UICorner", stealBtn).CornerRadius = UDim.new(0, 4)
-
-    stealBtn.MouseButton1Click:Connect(function()
-        ApplySteal(p.UserId)
-    end)
-end
-
--- Refresh List secara otomatis
-local function RefreshCatalog()
-    for _, child in pairs(catalogListFrame:GetChildren()) do
-        if child:IsA("Frame") then child:Destroy() end
-    end
-    for _, p in pairs(Players:GetPlayers()) do
-        CreatePlayerRow(p)
-    end
-end
-
-Players.PlayerAdded:Connect(RefreshCatalog)
-Players.PlayerRemoving:Connect(RefreshCatalog)
-RefreshCatalog()
-
--- Tombol Reset di paling bawah tab
-local resetAll = AddScriptButton("🔄 RESET AVATAR", function()
-    player:LoadCharacter()
-    ShowNotification("Character Reloaded")
-end, catalogTabFrame)
-resetAll.Size = UDim2.new(1, 0, 0, 35)
-resetAll.Position = UDim2.new(0, 0, 1, -35)
-resetAll.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
-
-listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    catalogListFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y)
 end)
 
 --- --- 🔹 SISTEM ANIMASI UNIVERSAL 🔹 --- ---
