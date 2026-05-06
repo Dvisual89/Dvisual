@@ -387,11 +387,6 @@ AddScriptButton("Fly Controller", function()
     ShowNotification("Animation Executed!")
 end)
 
-AddScriptButton("Sky Changer", function()
-    loadstring(game:HttpGet("https://github.com/Dvisual89/Dvisual/edit/main/Dvisual.lua"))()
-    ShowNotification("Animation Executed!")
-end
-
 AddScriptButton("Koin Hutan", function()
     loadstring(game:HttpGet("https://raw.githubusercontent.com/Dvisual89/Dvisual/refs/heads/main/Koin%20Hutan.lua"))()
     ShowNotification("Animation Executed!")
