@@ -345,7 +345,7 @@ end
 local function AddScriptButton(name, callback, parent)
     local btn = Instance.new("TextButton")
     btn.Parent = parent or homeTabFrame
-    btn.Size = UDim2.new(1, 0, 0, 40)
+    btn.Size = UDim2.new(1, 0, 0, 30)
     btn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     btn.BackgroundTransparency = 0.92
     btn.Text = name
