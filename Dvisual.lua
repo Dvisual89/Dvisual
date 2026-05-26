@@ -466,6 +466,7 @@ mainListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
 local AnimationData = {
     ["Idle"] = {
+		["Gremlin"] = {"101918025133407", "101918025133407"},
 		["(UGC) Uget"] = {"99638411514722", "10713992055"},
 		["(UGC) Udin"] = {"75750638564696", "71692149930645"},
 		["Billie Ellish"] = {"102934602884410", "92151291669373"},
@@ -543,7 +544,7 @@ local AnimationData = {
         ["Unboxed By Amazon"] = {"98281136301627", "138183121662404"}
     },
     ["Walk"] = {
-       ["(UGC) Uget"] = "102622695004986", ["(UGC) Udin"] = "125451074692113", ["Billie Ellish"] = "111071007924288", ["Katseye"] = "99182913548783", ["Glow Motion"] = "85809016093530", ["Adidas Aura"] = "83842218823011", ["Geto"] = "85811471336028", ["Gojo"] = "95643163365384", ["(UGC) Smooth"] = "76630051272791", ["AuraAnimationPack"] = "18747074203", ["Geto"] = "85811471336028", ["Patrol"] = "1151231493", ["Drooling Zombie"] = "3489174223", ["Adidas Community"] = "122150855457006", ["Levitation"] = "616013216", ["Catwalk Glam"] = "109168724482748", ["Knight"] = "10921127095", ["Pirate"] = "750785693", ["Bold"] = "16738340646", ["Sports (Adidas)"] = "18537392113", ["Zombie"] = "616168032", ["Astronaut"] = "891667138", ["Cartoony"] = "742640026", ["Ninja"] = "656121766", ["Confident"] = "1070017263", ["Wicked \"Dancing Through Life\""] = "73718308412641", ["Unboxed By Amazon"] = "90478085024465", ["Gojo"] = "95643163365384", ["R15 Reanimated"] = "4211223236", ["Ghost"] = "616013216", ["2016 Animation (mm2)"] = "387947975", ["(UGC) Zombie"] = "113603435314095", ["No Boundaries (Walmart)"] = "18747074203", ["Rthro"] = "10921269718", ["Werewolf"] = "1083178339", ["Wicked (Popular)"] = "92072849924640", ["Vampire"] = "1083473930", ["Popstar"] = "1212980338", ["Mage"] = "707897309", ["(UGC) Smooth"] = "76630051272791", ["R6"] = "12518152696", ["NFL"] = "110358958299415", ["Bubbly"] = "910034870", ["(UGC) Retro"] = "107806791584829", ["(UGC) Retro Zombie"] = "140703855480494", ["OldSchool"] = "10921244891", ["Elder"] = "10921111375", ["Stylish"] = "616146177", ["Stylized Female"] = "4708193840", ["Robot"] = "616095330", ["Sneaky"] = "1132510133", ["Superhero"] = "10921298616", ["Udzal"] = "3303162967", ["Toy"] = "782843345", ["Default Retarget"] = "115825677624788", ["Princess"] = "941028902", ["Cowboy"] = "1014421541"
+       ["Gremlin"] = "76359514564810", ["(UGC) Uget"] = "102622695004986", ["(UGC) Udin"] = "125451074692113", ["Billie Ellish"] = "111071007924288", ["Katseye"] = "99182913548783", ["Glow Motion"] = "85809016093530", ["Adidas Aura"] = "83842218823011", ["Geto"] = "85811471336028", ["Gojo"] = "95643163365384", ["(UGC) Smooth"] = "76630051272791", ["AuraAnimationPack"] = "18747074203", ["Geto"] = "85811471336028", ["Patrol"] = "1151231493", ["Drooling Zombie"] = "3489174223", ["Adidas Community"] = "122150855457006", ["Levitation"] = "616013216", ["Catwalk Glam"] = "109168724482748", ["Knight"] = "10921127095", ["Pirate"] = "750785693", ["Bold"] = "16738340646", ["Sports (Adidas)"] = "18537392113", ["Zombie"] = "616168032", ["Astronaut"] = "891667138", ["Cartoony"] = "742640026", ["Ninja"] = "656121766", ["Confident"] = "1070017263", ["Wicked \"Dancing Through Life\""] = "73718308412641", ["Unboxed By Amazon"] = "90478085024465", ["Gojo"] = "95643163365384", ["R15 Reanimated"] = "4211223236", ["Ghost"] = "616013216", ["2016 Animation (mm2)"] = "387947975", ["(UGC) Zombie"] = "113603435314095", ["No Boundaries (Walmart)"] = "18747074203", ["Rthro"] = "10921269718", ["Werewolf"] = "1083178339", ["Wicked (Popular)"] = "92072849924640", ["Vampire"] = "1083473930", ["Popstar"] = "1212980338", ["Mage"] = "707897309", ["(UGC) Smooth"] = "76630051272791", ["R6"] = "12518152696", ["NFL"] = "110358958299415", ["Bubbly"] = "910034870", ["(UGC) Retro"] = "107806791584829", ["(UGC) Retro Zombie"] = "140703855480494", ["OldSchool"] = "10921244891", ["Elder"] = "10921111375", ["Stylish"] = "616146177", ["Stylized Female"] = "4708193840", ["Robot"] = "616095330", ["Sneaky"] = "1132510133", ["Superhero"] = "10921298616", ["Udzal"] = "3303162967", ["Toy"] = "782843345", ["Default Retarget"] = "115825677624788", ["Princess"] = "941028902", ["Cowboy"] = "1014421541"
     },
     ["Run"] = {
 		["(UGC) Uget"] = "102622695004986",
@@ -1587,9 +1588,96 @@ end)
 
 -- 3. Fly Speed (Sinkron dengan variabel FlySpeed)
 CreateMovementSetting("Fly Speed", 0, 1000, 50, function(v)
-    FlySpeed = v -- Sekarang slider ini merubah variabel FlySpeed global
+    v = math.clamp(tonumber(v) or 50, 0, 1000)
+
+    -- Paksa global update
+    _G.FlySpeed = v
+    FlySpeed = v
+
+    -- Jika sedang fly, langsung refresh velocity
+    if Flying and BodyVelocity then
+        local camera = workspace.CurrentCamera
+        local moveDir = Vector3.zero
+
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+            moveDir += camera.CFrame.LookVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+            moveDir -= camera.CFrame.LookVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+            moveDir -= camera.CFrame.RightVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+            moveDir += camera.CFrame.RightVector
+        end
+
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+            moveDir += camera.CFrame.UpVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+            moveDir -= camera.CFrame.UpVector
+        end
+
+        if moveDir.Magnitude > 0 then
+            moveDir = moveDir.Unit
+        end
+
+        BodyVelocity.Velocity = moveDir * v
+    end
+
     ShowNotification("Fly Speed set to: " .. v)
 end)
+
+local DefaultWalkSpeed = 16
+local DefaultJumpPower = 50
+local DefaultFlySpeed = 50
+
+if movementTabFrame then
+    local resetMovementBtn = AddScriptButton("Reset Movement", function()
+        FlySpeed = DefaultFlySpeed
+        _G.FlySpeed = DefaultFlySpeed
+
+        local char = player.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+
+        if hum then
+            hum.WalkSpeed = DefaultWalkSpeed
+            hum.UseJumpPower = true
+            hum.JumpPower = DefaultJumpPower
+        end
+
+        if Flying and BodyVelocity then
+            BodyVelocity.Velocity = Vector3.zero
+        end
+
+        -- Update UI textbox otomatis
+        for _, obj in pairs(movementTabFrame:GetDescendants()) do
+            if obj:IsA("TextBox") then
+                local parentFrame = obj.Parent
+                local label = parentFrame:FindFirstChildWhichIsA("TextLabel")
+
+                if label then
+                    if string.find(label.Text, "Walk Speed") then
+                        obj.Text = tostring(DefaultWalkSpeed)
+                        label.Text = "Walk Speed [" .. DefaultWalkSpeed .. "]"
+
+                    elseif string.find(label.Text, "Jump Power") then
+                        obj.Text = tostring(DefaultJumpPower)
+                        label.Text = "Jump Power [" .. DefaultJumpPower .. "]"
+
+                    elseif string.find(label.Text, "Fly Speed") then
+                        obj.Text = tostring(DefaultFlySpeed)
+                        label.Text = "Fly Speed [" .. DefaultFlySpeed .. "]"
+                    end
+                end
+            end
+        end
+
+        ShowNotification("Movement Reset To Default")
+    end, movementTabFrame)
+end
+
 
 --- --- 🔹 CONTROL & MINIMIZE LOGIC 🔹 --- ---
 local closeBtn = Instance.new("TextButton")
@@ -1692,43 +1780,102 @@ local function StartFlying()
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     if not root or not hum then return end
 
+    -- Anti duplicate
+    if Flying then return end
+
     Flying = true
-    
-    BodyGyro = Instance.new("BodyGyro", root)
+
+    -- Bersihkan object lama
+    if BodyGyro then BodyGyro:Destroy() end
+    if BodyVelocity then BodyVelocity:Destroy() end
+    if FlyConnection then
+        FlyConnection:Disconnect()
+        FlyConnection = nil
+    end
+
+    BodyGyro = Instance.new("BodyGyro")
     BodyGyro.P = 9e4
     BodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
     BodyGyro.CFrame = root.CFrame
+    BodyGyro.Parent = root
 
-    BodyVelocity = Instance.new("BodyVelocity", root)
-    BodyVelocity.Velocity = Vector3.new(0, 0, 0)
+    BodyVelocity = Instance.new("BodyVelocity")
+    BodyVelocity.Velocity = Vector3.zero
     BodyVelocity.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+    BodyVelocity.Parent = root
 
     FlyConnection = RunService.RenderStepped:Connect(function()
-        if Flying and root and hum.Parent then
-            local camera = workspace.CurrentCamera
-            local moveDir = Vector3.new(0, 0, 0)
-            
-            -- Kontrol Keyboard
-            if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + camera.CFrame.LookVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - camera.CFrame.LookVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - camera.CFrame.RightVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + camera.CFrame.RightVector end
-            
-            -- PENGGUNAAN VARIABEL FLYSPEED YANG SUDAH DIUPDATE SLIDER
-            BodyVelocity.Velocity = moveDir * FlySpeed
-            BodyGyro.CFrame = camera.CFrame
-            hum.PlatformStand = true 
+        if not Flying or not root.Parent or hum.Health <= 0 then
+            StopFlying()
+            return
         end
+
+        local camera = workspace.CurrentCamera
+        local moveDir = Vector3.zero
+
+        -- Forward / Back
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+            moveDir += camera.CFrame.LookVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+            moveDir -= camera.CFrame.LookVector
+        end
+
+        -- Left / Right
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+            moveDir -= camera.CFrame.RightVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+            moveDir += camera.CFrame.RightVector
+        end
+
+        -- Up / Down
+		if UserInputService:IsKeyDown(Enum.KeyCode.Q) then
+			moveDir += camera.CFrame.UpVector
+		end
+
+		if UserInputService:IsKeyDown(Enum.KeyCode.E) then
+			moveDir -= camera.CFrame.UpVector
+		end
+
+        -- Normalisasi agar speed stabil
+        if moveDir.Magnitude > 0 then
+            moveDir = moveDir.Unit
+        end
+
+        -- FlySpeed dari slider langsung aktif
+        BodyVelocity.Velocity = moveDir * (_G.FlySpeed or FlySpeed or 50)
+
+        -- Arah kamera
+        BodyGyro.CFrame = camera.CFrame
+
+        hum.PlatformStand = true
     end)
 end
 
 local function StopFlying()
     Flying = false
-    if FlyConnection then FlyConnection:Disconnect() end
-    if BodyGyro then BodyGyro:Destroy() end
-    if BodyVelocity then BodyVelocity:Destroy() end
-    if player.Character and player.Character:FindFirstChildOfClass("Humanoid") then
-        player.Character:FindFirstChildOfClass("Humanoid").PlatformStand = false
+
+    if FlyConnection then
+        FlyConnection:Disconnect()
+        FlyConnection = nil
+    end
+
+    if BodyGyro then
+        BodyGyro:Destroy()
+        BodyGyro = nil
+    end
+
+    if BodyVelocity then
+        BodyVelocity:Destroy()
+        BodyVelocity = nil
+    end
+
+    if player.Character then
+        local hum = player.Character:FindFirstChildOfClass("Humanoid")
+        if hum then
+            hum.PlatformStand = false
+        end
     end
 end
 
@@ -1743,6 +1890,21 @@ if movementTabFrame then
             ShowNotification("Fly Deactivated")
         end
     end, movementTabFrame)
+
+	UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    -- Jangan aktif jika sedang mengetik di TextBox / UI
+    if gameProcessed then return end
+    
+    if input.KeyCode == Enum.KeyCode.F then
+        if not Flying then
+            StartFlying()
+            ShowNotification("Fly Activated (Shortcut F)")
+        else
+            StopFlying()
+            ShowNotification("Fly Deactivated (Shortcut F)")
+        end
+    end
+end)
 
     -- Loop kecil untuk update teks tombol secara otomatis
     task.spawn(function()
