@@ -144,9 +144,19 @@ local function CreateTabFrame(name, isVisible)
     frame.AnchorPoint = Vector2.new(0.5, 0.5)
     frame.BackgroundTransparency = 1
     frame.Visible = isVisible
+
+if name == "Home" then
+    local grid = Instance.new("UIGridLayout")
+    grid.Parent = frame
+    grid.CellSize = UDim2.new(0.49, -5, 0, 45)
+    grid.CellPadding = UDim2.new(0, 5, 0, 5)
+    grid.SortOrder = Enum.SortOrder.LayoutOrder
+else
     local layout = Instance.new("UIListLayout")
     layout.Parent = frame
     layout.Padding = UDim.new(0, 8)
+end
+
     return frame
 end
 
@@ -280,7 +290,7 @@ end
 local function AddScriptButton(name, callback, parent)
     local btn = Instance.new("TextButton")
     btn.Parent = parent or homeTabFrame
-    btn.Size = UDim2.new(1, 0, 0, 30)
+    btn.Size = UDim2.new(0, 0, 0, 30)
     btn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     btn.BackgroundTransparency = 0.92
     btn.Text = name
@@ -300,6 +310,11 @@ end)
 AddScriptButton("Infinite Yield", function()
     loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))()
     ShowNotification("Animation Executed!")
+end)
+
+AddScriptButton("Laser", function()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/KNTLX69/SXTHR666/refs/heads/main/SIEXTHER-HYTAMKAN"))()
+    ShowNotification("Laser Executed!")
 end)
 
 AddScriptButton("Animate SPy", function()
