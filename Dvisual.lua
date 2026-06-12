@@ -148,7 +148,7 @@ local function CreateTabFrame(name, isVisible)
 if name == "Home" then
     local grid = Instance.new("UIGridLayout")
     grid.Parent = frame
-    grid.CellSize = UDim2.new(0.49, -5, 0, 45)
+    grid.CellSize = UDim2.new(0.49, -5, 0, 35)
     grid.CellPadding = UDim2.new(0, 5, 0, 5)
     grid.SortOrder = Enum.SortOrder.LayoutOrder
 else
@@ -344,6 +344,21 @@ end)
 
 AddScriptButton("Koin Hutan", function()
     loadstring(game:HttpGet("https://raw.githubusercontent.com/Dvisual89/Dvisual/refs/heads/main/Koin%20Hutan.lua"))()
+    ShowNotification("Animation Executed!")
+end)
+
+AddScriptButton("Drop Kick", function()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/gsm231/Fe-DropKick/refs/heads/main/V0.1"))()
+    ShowNotification("Animation Executed!")
+end)
+
+AddScriptButton("Hide Invis FE", function()
+   loadstring(game:HttpGet("https://raw.githubusercontent.com/Kixdev/roblox-invisible-hybrid-script/main/main.lua"))()
+    ShowNotification("Animation Executed!")
+end)
+
+AddScriptButton("Hide Player Cine", function()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/Kixdev/hide-players-roblox/refs/heads/main/main.lua", true))()
     ShowNotification("Animation Executed!")
 end)
 
