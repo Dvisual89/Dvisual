@@ -332,8 +332,8 @@ AddScriptButton("Bring Coil", function()
     ShowNotification("Animation Executed!")
 end)
 
-AddScriptButton("Sambung Kata V3", function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/Dvisual89/Dvisual/refs/heads/main/Sambung%20Kata%20V3.lua"))()
+AddScriptButton("Sambung Kata V5", function()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/Dvisual89/Dvisual/refs/heads/main/Sambung%20Kata%20V5.lua"))()
     ShowNotification("Animation Executed!")
 end)
 
