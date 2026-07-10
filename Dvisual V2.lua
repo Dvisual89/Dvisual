@@ -1,235 +1,553 @@
-local LICENSE_KEY = "DV-Z5RRZ2-YSBKIA"
-
+-- ============================================================
+-- DVISUAL LICENSE SYSTEM - FIXED
+-- ============================================================
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
+local MarketplaceService = game:GetService("MarketplaceService")
 
 local player = Players.LocalPlayer
 
-
 local API_URL = "https://dvisual-api.budiksh6.workers.dev"
-
 local API_TOKEN = "dvisual_dimskuyyy21"
+local VERSION = "1.0.1"
 
+-- License key tidak lagi disimpan sebagai nilai default di dalam script.
+-- Pengguna wajib memasukkannya melalui UI sebelum menu utama dibuka.
+local RuntimeEnvironment = (getgenv and getgenv()) or _G
 
-local VERSION = "1.0.0"
-
-local function APIRequest(path, data)
-
-    local success, result = pcall(function()
-
-        return request({
-
-            Url = API_URL .. path,
-
-            Method = "POST",
-
-            Headers = {
-
-                ["Content-Type"] = "application/json",
-
-                ["X-API-Key"] = API_TOKEN
-
-            },
-
-            Body = HttpService:JSONEncode(data)
-
-        })
-
-    end)
-
-
-    if success then
-        return result
-    end
-
-
-    return nil
-
+local function NormalizeLicenseKey(value)
+    return tostring(value or "")
+        :upper()
+        :gsub("%s+", "")
 end
 
--- ============================
--- LICENSE SYSTEM
--- ============================
+local LICENSE_KEY = ""
+RuntimeEnvironment.DVISUAL_LICENSE_KEY = nil
 
-local LICENSE_KEY = "DV-Z5RRZ2-YSBKIA"
+local REQUEST_FUNCTION =
+    request
+    or http_request
+    or (syn and syn.request)
+    or (fluxus and fluxus.request)
 
+local LicenseState = {
+    Active = false,
+    Type = "Unknown",
+    Session = nil,
+    LastError = nil
+}
 
-local function CheckLicense()
+local function ValidateLocalLicenseKey(key)
+    if type(key) ~= "string" or key == "" then
+        return false, "License key is empty"
+    end
 
+    if #key < 8 or #key > 100 then
+        return false, "License key format is invalid"
+    end
 
-    local response =
-    APIRequest(
-        "/license/check",
-        {
+    return true
+end
 
-            userid = player.UserId,
+local function APIRequest(path, data)
+    if type(REQUEST_FUNCTION) ~= "function" then
+        return nil, "Executor does not support HTTP request"
+    end
 
-            key = LICENSE_KEY
+    local encodedOk, encodedBody = pcall(function()
+        return HttpService:JSONEncode(data or {})
+    end)
 
-        }
-    )
+    if not encodedOk then
+        return nil, "Failed to encode request data"
+    end
 
+    local requestOk, response = pcall(function()
+        return REQUEST_FUNCTION({
+            Url = API_URL .. path,
+            Method = "POST",
+            Headers = {
+                ["Content-Type"] = "application/json",
+                ["Accept"] = "application/json",
+                ["X-API-Key"] = API_TOKEN,
+                ["X-Dvisual-Version"] = VERSION
+            },
+            Body = encodedBody
+        })
+    end)
+
+    if not requestOk then
+        return nil, "Request failed: " .. tostring(response)
+    end
+
+    if type(response) ~= "table" then
+        return nil, "Invalid response from license server"
+    end
+
+    local statusCode = tonumber(response.StatusCode or response.Status or 0) or 0
+    if statusCode ~= 0 and (statusCode < 200 or statusCode >= 300) then
+        return nil, "License server returned HTTP " .. tostring(statusCode), statusCode
+    end
+
+    return response, nil, statusCode
+end
+
+local function DecodeAPIResponse(response)
+    if type(response) ~= "table" then
+        return nil, "Response is not a table"
+    end
+
+    local body = response.Body
+    if type(body) ~= "string" or body == "" then
+        return {}, nil
+    end
+
+    local decodeOk, decoded = pcall(function()
+        return HttpService:JSONDecode(body)
+    end)
+
+    if not decodeOk or type(decoded) ~= "table" then
+        return nil, "License server returned invalid JSON"
+    end
+
+    return decoded, nil
+end
+
+local function CheckLicense(candidateKey)
+    local normalizedKey = NormalizeLicenseKey(candidateKey)
+    local valid, validationError = ValidateLocalLicenseKey(normalizedKey)
+    if not valid then
+        LicenseState.LastError = validationError
+        warn("[Dvisual] " .. validationError)
+        return false
+    end
+
+    local response, requestError = APIRequest("/license/check", {
+        userid = player.UserId,
+        username = player.Name,
+        key = normalizedKey,
+        version = VERSION,
+        placeid = game.PlaceId,
+        jobid = game.JobId
+    })
 
     if not response then
-
-        warn("[Dvisual] License Server Failed")
-
+        LicenseState.LastError = requestError
+        warn("[Dvisual] License check failed: " .. tostring(requestError))
         return false
-
     end
 
-
-
-    local data =
-    HttpService:JSONDecode(
-        response.Body
-    )
-
-
-
-    if data.success then
-
-
-        print(
-            "[Dvisual] License:",
-            data.type
-        )
-
-
-        return true
-
-
-    else
-
-
-        warn(
-            "[Dvisual]",
-            data.error
-        )
-
-
+    local data, decodeError = DecodeAPIResponse(response)
+    if not data then
+        LicenseState.LastError = decodeError
+        warn("[Dvisual] License check failed: " .. tostring(decodeError))
         return false
-
-
     end
 
+    local accepted = data.success == true or data.valid == true
+    if not accepted then
+        local serverError = tostring(data.error or data.message or "License rejected")
+        LicenseState.LastError = serverError
+        warn("[Dvisual] " .. serverError)
+        return false
+    end
 
+    LICENSE_KEY = normalizedKey
+    RuntimeEnvironment.DVISUAL_LICENSE_KEY = LICENSE_KEY
+    LicenseState.Active = true
+    LicenseState.Type = tostring(data.type or data.license_type or "Valid")
+    LicenseState.Session = data.session or data.session_token or data.token
+    LicenseState.LastError = nil
+
+    print("[Dvisual] License accepted:", LicenseState.Type)
+    return true
 end
 
 local function SendReport()
+    if not LicenseState.Active then
+        return false
+    end
 
-    local gamename = "Unknown"
-
+    local gameName = "Unknown"
     pcall(function()
-
-        gamename =
-        game:GetService("MarketplaceService")
-        :GetProductInfo(game.PlaceId).Name
-
+        gameName = MarketplaceService:GetProductInfo(game.PlaceId).Name
     end)
 
-
-    local data = {
-
+    local response, requestError = APIRequest("/report", {
         userid = player.UserId,
-
         username = player.Name,
-
         displayname = player.DisplayName,
-
-
-        executor =
-        (identifyexecutor and identifyexecutor())
-        or "Unknown",
-
-
+        executor = (identifyexecutor and identifyexecutor()) or "Unknown",
         version = VERSION,
-
-
         placeid = game.PlaceId,
-
-
-        gamename = gamename,
-
-
+        gamename = gameName,
         jobid = game.JobId,
-
-
+        license_type = LicenseState.Type,
+        session = LicenseState.Session,
         device = "",
-
         country = ""
+    })
 
-    }
-
-
-
-    local response =
-    APIRequest("/report", data)
-
-
-    if response then
-
-        print("[Dvisual] Report sent")
-
-    else
-
-        warn("[Dvisual] Report failed")
-
+    if not response then
+        warn("[Dvisual] Report failed: " .. tostring(requestError))
+        return false
     end
 
+    print("[Dvisual] Report sent")
+    return true
 end
 
-if CheckLicense() then
+-- ============================================================
+-- LICENSE INPUT UI
+-- ============================================================
+local function CreateLicensePrompt()
+    local promptParent = game:GetService("CoreGui")
 
-    SendReport()
+    if gethui then
+        local ok, customParent = pcall(gethui)
+        if ok and customParent then
+            promptParent = customParent
+        end
+    end
 
-else
+    local oldPrompt = promptParent:FindFirstChild("DvisualLicensePrompt")
+    if oldPrompt then
+        oldPrompt:Destroy()
+    end
 
-    warn("[Dvisual] Access Denied")
+    local promptGui = Instance.new("ScreenGui")
+    promptGui.Name = "DvisualLicensePrompt"
+    promptGui.ResetOnSpawn = false
+    promptGui.IgnoreGuiInset = true
+    promptGui.DisplayOrder = 999999
+    promptGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    promptGui.Parent = promptParent
 
-end
+    if protect_gui then
+        pcall(protect_gui, promptGui)
+    elseif syn and syn.protect_gui then
+        pcall(syn.protect_gui, promptGui)
+    end
 
--- ============================
--- HEARTBEAT SYSTEM
--- ============================
+    local overlay = Instance.new("Frame")
+    overlay.Name = "Overlay"
+    overlay.Size = UDim2.fromScale(1, 1)
+    overlay.BackgroundColor3 = Color3.fromRGB(7, 9, 14)
+    overlay.BackgroundTransparency = 0.18
+    overlay.BorderSizePixel = 0
+    overlay.Active = true
+    overlay.Parent = promptGui
 
-task.spawn(function()
+    local panel = Instance.new("Frame")
+    panel.Name = "LicensePanel"
+    panel.AnchorPoint = Vector2.new(0.5, 0.5)
+    panel.Position = UDim2.fromScale(0.5, 0.5)
+    panel.Size = UDim2.new(0, 390, 0, 270)
+    panel.BackgroundColor3 = Color3.fromRGB(20, 24, 34)
+    panel.BorderSizePixel = 0
+    panel.Active = true
+    panel.Parent = overlay
 
-    while true do
+    local panelCorner = Instance.new("UICorner")
+    panelCorner.CornerRadius = UDim.new(0, 18)
+    panelCorner.Parent = panel
 
-        task.wait(30)
+    local panelStroke = Instance.new("UIStroke")
+    panelStroke.Color = Color3.fromRGB(92, 115, 255)
+    panelStroke.Transparency = 0.15
+    panelStroke.Thickness = 1.3
+    panelStroke.Parent = panel
 
+    local gradient = Instance.new("UIGradient")
+    gradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(27, 32, 47)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(17, 20, 29))
+    })
+    gradient.Rotation = 35
+    gradient.Parent = panel
 
-        local success, result =
-        pcall(function()
+    local accent = Instance.new("Frame")
+    accent.Size = UDim2.new(1, -28, 0, 4)
+    accent.Position = UDim2.new(0, 14, 0, 12)
+    accent.BorderSizePixel = 0
+    accent.BackgroundColor3 = Color3.fromRGB(98, 119, 255)
+    accent.Parent = panel
 
+    local accentCorner = Instance.new("UICorner")
+    accentCorner.CornerRadius = UDim.new(1, 0)
+    accentCorner.Parent = accent
 
-            return APIRequest(
-                "/heartbeat",
-                {
+    local accentGradient = Instance.new("UIGradient")
+    accentGradient.Color = ColorSequence.new(
+        Color3.fromRGB(98, 119, 255),
+        Color3.fromRGB(116, 225, 255)
+    )
+    accentGradient.Parent = accent
 
-                    userid = player.UserId
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Position = UDim2.new(0, 24, 0, 28)
+    titleLabel.Size = UDim2.new(1, -48, 0, 32)
+    titleLabel.Font = Enum.Font.GothamBold
+    titleLabel.Text = "Dvisual License"
+    titleLabel.TextColor3 = Color3.fromRGB(247, 249, 255)
+    titleLabel.TextSize = 21
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    titleLabel.Parent = panel
 
-                }
-            )
+    local description = Instance.new("TextLabel")
+    description.BackgroundTransparency = 1
+    description.Position = UDim2.new(0, 24, 0, 63)
+    description.Size = UDim2.new(1, -48, 0, 38)
+    description.Font = Enum.Font.GothamMedium
+    description.Text = "Masukkan license key untuk membuka Dvisual."
+    description.TextColor3 = Color3.fromRGB(172, 181, 204)
+    description.TextSize = 12
+    description.TextWrapped = true
+    description.TextXAlignment = Enum.TextXAlignment.Left
+    description.TextYAlignment = Enum.TextYAlignment.Top
+    description.Parent = panel
 
+    local keyBox = Instance.new("TextBox")
+    keyBox.Name = "KeyInput"
+    keyBox.Position = UDim2.new(0, 24, 0, 112)
+    keyBox.Size = UDim2.new(1, -48, 0, 44)
+    keyBox.BackgroundColor3 = Color3.fromRGB(31, 37, 52)
+    keyBox.BorderSizePixel = 0
+    keyBox.ClearTextOnFocus = false
+    keyBox.Font = Enum.Font.GothamSemibold
+    keyBox.PlaceholderText = "DV-XXXXXX-XXXXXX"
+    keyBox.PlaceholderColor3 = Color3.fromRGB(115, 124, 148)
+    keyBox.Text = ""
+    keyBox.TextColor3 = Color3.fromRGB(245, 247, 255)
+    keyBox.TextSize = 14
+    keyBox.TextXAlignment = Enum.TextXAlignment.Left
+    keyBox.Parent = panel
 
-        end)
+    local keyPadding = Instance.new("UIPadding")
+    keyPadding.PaddingLeft = UDim.new(0, 14)
+    keyPadding.PaddingRight = UDim.new(0, 14)
+    keyPadding.Parent = keyBox
 
+    local keyCorner = Instance.new("UICorner")
+    keyCorner.CornerRadius = UDim.new(0, 11)
+    keyCorner.Parent = keyBox
 
-        if success and result then
+    local keyStroke = Instance.new("UIStroke")
+    keyStroke.Color = Color3.fromRGB(74, 88, 126)
+    keyStroke.Transparency = 0.25
+    keyStroke.Thickness = 1
+    keyStroke.Parent = keyBox
 
-            print("[Dvisual] Heartbeat OK")
+    local statusLabel = Instance.new("TextLabel")
+    statusLabel.BackgroundTransparency = 1
+    statusLabel.Position = UDim2.new(0, 24, 0, 162)
+    statusLabel.Size = UDim2.new(1, -48, 0, 28)
+    statusLabel.Font = Enum.Font.GothamMedium
+    statusLabel.Text = ""
+    statusLabel.TextColor3 = Color3.fromRGB(255, 112, 112)
+    statusLabel.TextSize = 11
+    statusLabel.TextWrapped = true
+    statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+    statusLabel.Parent = panel
 
-        else
+    local submitButton = Instance.new("TextButton")
+    submitButton.Name = "Submit"
+    submitButton.Position = UDim2.new(0, 24, 1, -62)
+    submitButton.Size = UDim2.new(1, -104, 0, 38)
+    submitButton.BackgroundColor3 = Color3.fromRGB(93, 113, 255)
+    submitButton.BorderSizePixel = 0
+    submitButton.AutoButtonColor = true
+    submitButton.Font = Enum.Font.GothamBold
+    submitButton.Text = "VERIFY KEY"
+    submitButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    submitButton.TextSize = 12
+    submitButton.Parent = panel
 
-            warn("[Dvisual] Heartbeat Failed")
+    local submitCorner = Instance.new("UICorner")
+    submitCorner.CornerRadius = UDim.new(0, 11)
+    submitCorner.Parent = submitButton
 
+    local closeButton = Instance.new("TextButton")
+    closeButton.Name = "Close"
+    closeButton.Position = UDim2.new(1, -72, 1, -62)
+    closeButton.Size = UDim2.new(0, 48, 0, 38)
+    closeButton.BackgroundColor3 = Color3.fromRGB(45, 51, 68)
+    closeButton.BorderSizePixel = 0
+    closeButton.AutoButtonColor = true
+    closeButton.Font = Enum.Font.GothamBold
+    closeButton.Text = "X"
+    closeButton.TextColor3 = Color3.fromRGB(220, 225, 238)
+    closeButton.TextSize = 13
+    closeButton.Parent = panel
+
+    local closeCorner = Instance.new("UICorner")
+    closeCorner.CornerRadius = UDim.new(0, 11)
+    closeCorner.Parent = closeButton
+
+    local resultEvent = Instance.new("BindableEvent")
+    local verifying = false
+    local closed = false
+
+    local function SetBusy(isBusy)
+        verifying = isBusy
+        keyBox.TextEditable = not isBusy
+        submitButton.Active = not isBusy
+        submitButton.AutoButtonColor = not isBusy
+        submitButton.Text = isBusy and "VERIFYING..." or "VERIFY KEY"
+        submitButton.BackgroundColor3 = isBusy
+            and Color3.fromRGB(65, 73, 105)
+            or Color3.fromRGB(93, 113, 255)
+    end
+
+    local function SubmitKey()
+        if verifying or closed then
+            return
         end
 
+        local enteredKey = NormalizeLicenseKey(keyBox.Text)
+        keyBox.Text = enteredKey
 
+        local localValid, localError = ValidateLocalLicenseKey(enteredKey)
+        if not localValid then
+            statusLabel.TextColor3 = Color3.fromRGB(255, 112, 112)
+            statusLabel.Text = tostring(localError)
+            return
+        end
+
+        SetBusy(true)
+        statusLabel.TextColor3 = Color3.fromRGB(166, 190, 255)
+        statusLabel.Text = "Menghubungkan ke license server..."
+
+        task.spawn(function()
+            local accepted = CheckLicense(enteredKey)
+
+            if accepted then
+                statusLabel.TextColor3 = Color3.fromRGB(105, 231, 155)
+                statusLabel.Text = "Key valid. Membuka Dvisual..."
+                task.wait(0.45)
+
+                if not closed then
+                    closed = true
+                    resultEvent:Fire(true)
+                end
+            else
+                SetBusy(false)
+                statusLabel.TextColor3 = Color3.fromRGB(255, 112, 112)
+                statusLabel.Text = tostring(LicenseState.LastError or "License key ditolak")
+                keyBox:CaptureFocus()
+            end
+        end)
     end
 
+    submitButton.MouseButton1Click:Connect(SubmitKey)
+    keyBox.FocusLost:Connect(function(enterPressed)
+        if enterPressed then
+            SubmitKey()
+        end
+    end)
+
+    closeButton.MouseButton1Click:Connect(function()
+        if closed then return end
+        closed = true
+        LicenseState.LastError = "License prompt closed by user"
+        resultEvent:Fire(false)
+    end)
+
+    task.defer(function()
+        if keyBox.Parent then
+            keyBox:CaptureFocus()
+        end
+    end)
+
+    local accepted = resultEvent.Event:Wait()
+    resultEvent:Destroy()
+    promptGui:Destroy()
+    return accepted == true
+end
+
+-- License prompt adalah gate utama. Menu Dvisual belum dibuat sampai key valid.
+if not CreateLicensePrompt() then
+    warn("[Dvisual] Access Denied: " .. tostring(LicenseState.LastError or "License verification cancelled"))
+    return
+end
+
+task.spawn(SendReport)
+
+-- ============================================================
+-- LICENSE HEARTBEAT
+-- ============================================================
+local HeartbeatRunning = true
+local ConsecutiveHeartbeatFailures = 0
+local MAX_HEARTBEAT_FAILURES = 5
+
+local function StopLicenseHeartbeat()
+    HeartbeatRunning = false
+end
+
+RuntimeEnvironment.DVISUAL_STOP_LICENSE_HEARTBEAT = StopLicenseHeartbeat
+
+task.spawn(function()
+    while HeartbeatRunning and LicenseState.Active do
+        task.wait(30)
+
+        if not HeartbeatRunning or not LicenseState.Active then
+            break
+        end
+
+        local response, requestError, statusCode = APIRequest("/heartbeat", {
+            userid = player.UserId,
+            key = LICENSE_KEY,
+            session = LicenseState.Session,
+            version = VERSION,
+            placeid = game.PlaceId,
+            jobid = game.JobId
+        })
+
+        if not response then
+            ConsecutiveHeartbeatFailures = ConsecutiveHeartbeatFailures + 1
+            warn(
+                "[Dvisual] Heartbeat failed ("
+                .. tostring(ConsecutiveHeartbeatFailures)
+                .. "/"
+                .. tostring(MAX_HEARTBEAT_FAILURES)
+                .. "): "
+                .. tostring(requestError)
+            )
+
+            -- HTTP 401/403 berarti akses memang ditolak, bukan sekadar jaringan putus.
+            if statusCode == 401 or statusCode == 403 then
+                LicenseState.Active = false
+                LicenseState.LastError = requestError
+                break
+            end
+        else
+            local heartbeatData = DecodeAPIResponse(response)
+
+            if type(heartbeatData) == "table"
+                and (heartbeatData.success == false or heartbeatData.valid == false) then
+                LicenseState.Active = false
+                LicenseState.LastError = tostring(
+                    heartbeatData.error
+                    or heartbeatData.message
+                    or "License heartbeat rejected"
+                )
+                warn("[Dvisual] " .. LicenseState.LastError)
+                break
+            end
+
+            ConsecutiveHeartbeatFailures = 0
+            print("[Dvisual] Heartbeat OK")
+        end
+
+        -- Kegagalan jaringan berulang menghentikan heartbeat, tetapi tidak membuat loop tak terbatas.
+        if ConsecutiveHeartbeatFailures >= MAX_HEARTBEAT_FAILURES then
+            warn("[Dvisual] Heartbeat stopped after repeated connection failures")
+            break
+        end
+    end
+
+    HeartbeatRunning = false
 end)
 
 local oldGui = game:GetService("CoreGui"):FindFirstChild("DvisualUI_Final")
@@ -2962,6 +3280,9 @@ minBtn.MouseButton1Click:Connect(toggleMinimize)
 closeBtn.MouseButton1Click:Connect(function()
     if CleanupMovementFeatures then
         CleanupMovementFeatures()
+    end
+    if StopLicenseHeartbeat then
+        StopLicenseHeartbeat()
     end
     gui:Destroy()
 end)
