@@ -256,7 +256,8 @@ local FlyConnection = nil
 
 local SavedAnimations = {
     ["Idle"] = nil, ["Walk"] = nil, ["Run"] = nil,
-    ["Jump"] = nil, ["Fall"] = nil, ["Climb"] = nil, ["Swim"] = nil
+    ["Jump"] = nil, ["Fall"] = nil, ["Climb"] = nil,
+    ["SwimIdle"] = nil, ["Swim"] = nil
 }
 
 local AnimationData = {
@@ -1564,95 +1565,523 @@ local AnimationData = {
 			}
 		}
 
---- --- 🔹 FUNGSI APPLY UNIVERSAL (SMART DETECTION) 🔹 --- ---
+--- --- 🔹 FUNGSI APPLY UNIVERSAL + SET ANIMASI 🔹 --- ---
 
-local function ApplyInstantAnimation(category, data)
+-- Urutan kategori yang dipakai oleh dropdown biasa dan Set Animasi.
+local CategoryOrder = {"Idle", "Walk", "Run", "Jump", "Fall", "Climb", "SwimIdle", "Swim"}
+
+-- Referensi tombol kategori agar teksnya ikut berubah saat sebuah set diterapkan.
+local AnimationCategoryToggles = {}
+local AnimationSetToggle = nil
+
+-- Snapshot animasi yang dipakai karakter sebelum Dvisual menggantinya.
+-- Snapshot ini hanya diambil satu kali, tepat sebelum perubahan animasi pertama.
+local PreviousAnimations = {}
+local HasCapturedPreviousAnimations = false
+
+-- Nama child Animation tidak wajib sama pada semua versi Animate,
+-- tetapi nama-nama ini mengikuti struktur Animate Roblox yang umum.
+local AnimationObjectNames = {
+    Idle = "Animation1",
+    Walk = "WalkAnim",
+    Run = "RunAnim",
+    Jump = "JumpAnim",
+    Fall = "FallAnim",
+    Climb = "ClimbAnim",
+    SwimIdle = "SwimIdle",
+    Swim = "Swim"
+}
+
+local function GetAnimationFolderName(category)
+    return category == "Idle" and "idle" or category:lower()
+end
+
+local function CopyAnimationValue(value)
+    if type(value) ~= "table" then
+        return value
+    end
+
+    local copied = {}
+    for index, item in ipairs(value) do
+        copied[index] = item
+    end
+    return copied
+end
+
+local function CopyAnimationMap(source)
+    local copied = {}
+    for _, category in ipairs(CategoryOrder) do
+        if source[category] ~= nil then
+            copied[category] = CopyAnimationValue(source[category])
+        end
+    end
+    return copied
+end
+
+local function ExtractAnimationId(animationId)
+    local value = tostring(animationId or "")
+    return value:match("(%d+)")
+end
+
+local function ReadAnimationCategory(animateScript, category)
+    local folder = animateScript:FindFirstChild(GetAnimationFolderName(category))
+    if not folder then
+        return nil
+    end
+
+    local preferredName = AnimationObjectNames[category] or "Animation1"
+    local entries = {}
+
+    for _, child in ipairs(folder:GetChildren()) do
+        if child:IsA("Animation") then
+            local id = ExtractAnimationId(child.AnimationId)
+            if id then
+                table.insert(entries, {
+                    Id = id,
+                    Name = child.Name
+                })
+            end
+        end
+    end
+
+    table.sort(entries, function(a, b)
+        local function GetRank(entry)
+            if entry.Name == preferredName then
+                return 1
+            end
+
+            local number = tonumber(entry.Name:match("^Animation(%d+)$"))
+            if number then
+                return number
+            end
+
+            return 999
+        end
+
+        local rankA = GetRank(a)
+        local rankB = GetRank(b)
+
+        if rankA ~= rankB then
+            return rankA < rankB
+        end
+
+        return a.Name < b.Name
+    end)
+
+    if #entries == 0 then
+        return nil
+    end
+
+    if #entries == 1 then
+        return entries[1].Id
+    end
+
+    local ids = {}
+    for index, entry in ipairs(entries) do
+        ids[index] = entry.Id
+    end
+    return ids
+end
+
+local function CapturePreviousAnimations(animateScript)
+    if HasCapturedPreviousAnimations or not animateScript then
+        return HasCapturedPreviousAnimations
+    end
+
+    local capturedCount = 0
+    local snapshot = {}
+
+    for _, category in ipairs(CategoryOrder) do
+        local data = ReadAnimationCategory(animateScript, category)
+        if data ~= nil then
+            snapshot[category] = data
+            capturedCount = capturedCount + 1
+        end
+    end
+
+    if capturedCount > 0 then
+        PreviousAnimations = snapshot
+        HasCapturedPreviousAnimations = true
+        return true
+    end
+
+    return false
+end
+
+local function ConfigureAnimationCategory(animateClone, category, data)
+    local folderName = GetAnimationFolderName(category)
+    local targetFolder = animateClone:FindFirstChild(folderName)
+
+    if not targetFolder or data == nil then
+        return false
+    end
+
+    targetFolder:ClearAllChildren()
+
+    local firstAnimationName = AnimationObjectNames[category] or "Animation1"
+
+    local function CreateEntry(id, name)
+        if id == nil then return end
+
+        local animation = Instance.new("Animation")
+        animation.Name = name
+        animation.AnimationId = "rbxassetid://" .. tostring(id)
+        animation.Parent = targetFolder
+
+        -- Dipertahankan agar kompatibel dengan struktur script sebelumnya.
+        local value = Instance.new("StringValue")
+        value.Name = name
+        value.Value = tostring(id)
+        value.Parent = targetFolder
+    end
+
+    if type(data) == "table" then
+        for index, id in ipairs(data) do
+            local entryName = index == 1 and firstAnimationName or ("Animation" .. index)
+            CreateEntry(id, entryName)
+        end
+    else
+        CreateEntry(data, firstAnimationName)
+    end
+
+    if category == "Idle" then
+        local firstIdle = targetFolder:FindFirstChild(firstAnimationName)
+        if firstIdle and firstIdle:IsA("Animation") then
+            local weight1 = Instance.new("NumberValue")
+            weight1.Name = "Weight"
+            weight1.Value = 9
+            weight1.Parent = firstIdle
+        end
+
+        local secondIdle = targetFolder:FindFirstChild("Animation2")
+        if secondIdle and secondIdle:IsA("Animation") then
+            local weight2 = Instance.new("NumberValue")
+            weight2.Name = "Weight"
+            weight2.Value = 1
+            weight2.Parent = secondIdle
+        end
+    end
+
+    return true
+end
+
+-- Memasang satu atau banyak kategori hanya dengan satu kali clone/refresh Animate.
+-- Ini lebih stabil daripada menghancurkan Animate delapan kali secara berurutan.
+local function ApplyAnimationBatch(animationMap)
     local char = player.Character
     local animate = char and char:FindFirstChild("Animate")
     local humanoid = char and char:FindFirstChildOfClass("Humanoid")
-    
-    if animate and humanoid then
-        SavedAnimations[category] = data
-        local folderName = category == "Idle" and "idle" or category:lower()
-        
-        -- Gunakan Clone untuk memastikan script membaca ulang ID baru
-        local animateClone = animate:Clone()
-        local targetFolder = animateClone:FindFirstChild(folderName)
-        
-        if targetFolder then
-            targetFolder:ClearAllChildren()
-            
-            local animName = "Animation1"
-            if folderName == "jump" then animName = "JumpAnim"
-            elseif folderName == "fall" then animName = "FallAnim" end
 
-            local function CreateEntry(id, name, parent)
-                local a = Instance.new("Animation")
-                a.Name = name; a.AnimationId = "rbxassetid://"..id; a.Parent = parent
-                local v = Instance.new("StringValue")
-                v.Name = name; v.Parent = parent
-            end
+    if not animate or not humanoid then
+        ShowNotification("Character or Animate is not ready.")
+        return false
+    end
 
-            if type(data) == "table" then
-				for i, id in ipairs(data) do
-					CreateEntry(id, (i == 1 and animName) or ("Animation"..i), targetFolder)
-				end
-			else
-				CreateEntry(data, animName, targetFolder)
-			end
+    -- Simpan animasi awal sebelum perubahan pertama dilakukan.
+    CapturePreviousAnimations(animate)
 
-			-- POINT 3 & 4 TARUH DI SINI
-			if folderName == "idle" then
-				if targetFolder:FindFirstChild("Animation1") then
-					local w1 = Instance.new("NumberValue")
-					w1.Name = "Weight"
-					w1.Value = 9
-					w1.Parent = targetFolder.Animation1
-				end
+    local animateClone = animate:Clone()
+    local appliedCount = 0
 
-				if targetFolder:FindFirstChild("Animation2") then
-					local w2 = Instance.new("NumberValue")
-					w2.Name = "Weight"
-					w2.Value = 1
-					w2.Parent = targetFolder.Animation2
-				end
-			end
-
-            -- Hancurkan yang lama dan pasang yang baru (Nuclear Refresh)
-            animate:Destroy()
-            for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do track:Stop(0) end
-            animateClone.Parent = char
-            
-            -- Trigger fisik
-            humanoid:ChangeState(Enum.HumanoidStateType.Landing)
-            local s = humanoid.WalkSpeed; humanoid.WalkSpeed = 0; task.wait(0.05); humanoid.WalkSpeed = s
+    for _, category in ipairs(CategoryOrder) do
+        local data = animationMap[category]
+        if data ~= nil and ConfigureAnimationCategory(animateClone, category, data) then
+            SavedAnimations[category] = data
+            appliedCount = appliedCount + 1
         end
     end
-end
 
-local function ResetToDefaultAnimations()
-    local char = player.Character
-    if not char then return end
-    
-    local humanoid = char:FindFirstChildOfClass("Humanoid")
-    local animate = char:FindFirstChild("Animate")
-
-    -- 1. Kosongkan memori SavedAnimations agar tidak otomatis terpasang lagi saat respawn
-    for k, v in pairs(SavedAnimations) do 
-        SavedAnimations[k] = nil 
+    if appliedCount == 0 then
+        animateClone:Destroy()
+        return false
     end
 
-    -- 2. RESET TOTAL: Menggunakan LoadCharacter
-    -- Ini adalah satu-satunya cara paling stabil di Roblox untuk mengembalikan 
-    -- semua animasi bundle (Ninja, Mage, Old School, dll) secara instan.
-    player:LoadCharacter()
-    
-    -- Notifikasi Sukses
-    ShowNotification("Animations Reset to Avatar Default!")
+    animate:Destroy()
+
+    for _, track in ipairs(humanoid:GetPlayingAnimationTracks()) do
+        track:Stop(0)
+    end
+
+    animateClone.Parent = char
+
+    -- Memaksa Animate membaca konfigurasi baru.
+    humanoid:ChangeState(Enum.HumanoidStateType.Landing)
+    local oldWalkSpeed = humanoid.WalkSpeed
+    humanoid.WalkSpeed = 0
+    task.wait(0.05)
+    humanoid.WalkSpeed = oldWalkSpeed
+
+    return true, appliedCount
 end
 
--- Urutan Tampilan
-local CategoryOrder = {"Idle", "Walk", "Run", "Jump", "Fall", "Climb","SwimIdle", "Swim"}
+local function ApplyInstantAnimation(category, data)
+    return ApplyAnimationBatch({[category] = data})
+end
+
+-- Normalisasi nama membuat "SuperHero" dan "Superhero" dianggap set yang sama,
+-- serta mengabaikan spasi/tab yang tidak sengaja ada di AnimationData.
+local function NormalizeAnimationSetName(name)
+    return tostring(name)
+        :lower()
+        :gsub("%s+", " ")
+        :match("^%s*(.-)%s*$")
+end
+
+-- Membentuk SEMUA set secara otomatis langsung dari AnimationData.
+-- Set tidak wajib lengkap. Jika sebuah kategori tidak tersedia, kategori itu
+-- tidak akan diubah ketika set dipilih dan tetap memakai animasi sebelumnya.
+local function BuildAllAnimationSets()
+    local indexedSets = {}
+
+    for _, category in ipairs(CategoryOrder) do
+        for realName, animationData in pairs(AnimationData[category] or {}) do
+            local normalizedName = NormalizeAnimationSetName(realName)
+            local setInfo = indexedSets[normalizedName]
+
+            if not setInfo then
+                setInfo = {
+                    Name = tostring(realName):match("^%s*(.-)%s*$"),
+                    Animations = {},
+                    SourceNames = {},
+                    CategoryCount = 0,
+                    AvailableCategories = {}
+                }
+                indexedSets[normalizedName] = setInfo
+            end
+
+            -- Hindari penambahan hitungan dua kali jika ada nama duplikat
+            -- pada kategori yang sama.
+            if setInfo.Animations[category] == nil then
+                setInfo.CategoryCount = setInfo.CategoryCount + 1
+                table.insert(setInfo.AvailableCategories, category)
+            end
+
+            setInfo.Animations[category] = animationData
+            setInfo.SourceNames[category] = realName
+        end
+    end
+
+    local allSets = {}
+
+    for _, setInfo in pairs(indexedSets) do
+        table.sort(setInfo.AvailableCategories, function(a, b)
+            local ai = table.find(CategoryOrder, a) or 999
+            local bi = table.find(CategoryOrder, b) or 999
+            return ai < bi
+        end)
+        table.insert(allSets, setInfo)
+    end
+
+    table.sort(allSets, function(a, b)
+        -- Set lengkap ditaruh lebih dahulu, lalu diurutkan berdasarkan nama.
+        if a.CategoryCount ~= b.CategoryCount then
+            return a.CategoryCount > b.CategoryCount
+        end
+        return a.Name:lower() < b.Name:lower()
+    end)
+
+    return allSets
+end
+
+local function ApplyAnimationSet(setInfo)
+    if not setInfo or not setInfo.Animations then
+        ShowNotification("Animation set is invalid.")
+        return
+    end
+
+    local success, appliedCount = ApplyAnimationBatch(setInfo.Animations)
+
+    if success then
+        for _, category in ipairs(CategoryOrder) do
+            -- Hanya perbarui kategori yang benar-benar tersedia pada set.
+            -- Kategori yang tidak ada tetap memakai pilihan sebelumnya.
+            if setInfo.Animations[category] ~= nil then
+                local toggle = AnimationCategoryToggles[category]
+                if toggle then
+                    local sourceName = setInfo.SourceNames[category] or setInfo.Name
+                    toggle.Text = sourceName .. " ▼"
+                end
+            end
+        end
+
+        ShowNotification(setInfo.Name .. " set applied (" .. tostring(appliedCount) .. "/8 available)!")
+    else
+        ShowNotification("Failed to apply animation set.")
+    end
+end
+
+local function ResetToPreviousAnimations()
+    local char = player.Character
+    local animate = char and char:FindFirstChild("Animate")
+
+    -- Jika belum pernah mengganti animasi, ambil kondisi yang sedang dipakai sekarang.
+    if not HasCapturedPreviousAnimations and animate then
+        CapturePreviousAnimations(animate)
+    end
+
+    if not HasCapturedPreviousAnimations or next(PreviousAnimations) == nil then
+        ShowNotification("Previous animations were not found.")
+        return
+    end
+
+    -- Hapus pilihan custom lama terlebih dahulu agar kategori yang tersimpan
+    -- benar-benar kembali ke snapshot sebelum Dvisual melakukan perubahan.
+    for _, category in ipairs(CategoryOrder) do
+        SavedAnimations[category] = nil
+    end
+
+    local success, restoredCount = ApplyAnimationBatch(CopyAnimationMap(PreviousAnimations))
+
+    if success then
+        if AnimationSetToggle then
+            AnimationSetToggle.Text = "Previous Animations Restored ▼"
+        end
+
+        for _, category in ipairs(CategoryOrder) do
+            local toggle = AnimationCategoryToggles[category]
+            if toggle then
+                if PreviousAnimations[category] ~= nil then
+                    toggle.Text = "Previous " .. category .. " ▼"
+                else
+                    toggle.Text = "Select " .. category .. " ▼"
+                end
+            end
+        end
+
+        ShowNotification("Previous animations restored (" .. tostring(restoredCount) .. "/8)!")
+    else
+        ShowNotification("Failed to restore previous animations.")
+    end
+end
+
+-- Baris dropdown SET ANIMASI. Semua paket, termasuk yang tidak lengkap, diambil otomatis dari AnimationData.
+local function CreateAnimationSetCategory(order)
+    local animationSets = BuildAllAnimationSets()
+
+    local rowFrame = Instance.new("Frame")
+    rowFrame.Name = "AnimationSetRow"
+    rowFrame.Size = UDim2.new(1, 0, 0, 30)
+    rowFrame.BackgroundTransparency = 1
+    rowFrame.LayoutOrder = order
+    rowFrame.Parent = animTabContent
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.3, 0, 0, 30)
+    label.Text = "SET ANIMASI"
+    label.TextColor3 = Color3.fromRGB(120, 190, 255)
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = 11
+    label.BackgroundTransparency = 1
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = rowFrame
+
+    local toggle = Instance.new("TextButton")
+    toggle.Size = UDim2.new(0.65, 0, 0, 24)
+    toggle.Position = UDim2.new(0.35, 0, 0, 3)
+    toggle.BackgroundColor3 = Color3.fromRGB(55, 80, 130)
+    toggle.Text = "Select Animation Set (" .. tostring(#animationSets) .. ") ▼"
+    toggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    toggle.Font = Enum.Font.GothamSemibold
+    toggle.TextSize = 9
+    toggle.Parent = rowFrame
+    Instance.new("UICorner", toggle).CornerRadius = UDim.new(0, 5)
+    AnimationSetToggle = toggle
+
+    local search = Instance.new("TextBox")
+    search.Size = UDim2.new(0.65, 0, 0, 22)
+    search.Position = UDim2.new(0.35, 0, 0, 32)
+    search.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    search.PlaceholderText = "🔍 Search all animation sets..."
+    search.Text = ""
+    search.TextColor3 = Color3.fromRGB(255, 255, 255)
+    search.Font = Enum.Font.Gotham
+    search.TextSize = 9
+    search.Visible = false
+    search.Parent = rowFrame
+    Instance.new("UICorner", search).CornerRadius = UDim.new(0, 5)
+
+    local scroll = Instance.new("ScrollingFrame")
+    scroll.Size = UDim2.new(0.65, 0, 0, 0)
+    scroll.Position = UDim2.new(0.35, 0, 0, 56)
+    scroll.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    scroll.BorderSizePixel = 0
+    scroll.ScrollBarThickness = 2
+    scroll.Visible = false
+    scroll.Parent = rowFrame
+    Instance.new("UICorner", scroll).CornerRadius = UDim.new(0, 5)
+
+    local listLayout = Instance.new("UIListLayout")
+    listLayout.Parent = scroll
+    listLayout.Padding = UDim.new(0, 2)
+    listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+    local function CloseDropdown()
+        search.Visible = false
+        TweenService:Create(scroll, TweenInfo.new(0.2), {
+            Size = UDim2.new(0.65, 0, 0, 0)
+        }):Play()
+        TweenService:Create(rowFrame, TweenInfo.new(0.2), {
+            Size = UDim2.new(1, 0, 0, 30)
+        }):Play()
+        task.wait(0.2)
+        scroll.Visible = false
+    end
+
+    toggle.MouseButton1Click:Connect(function()
+        if scroll.Visible then
+            CloseDropdown()
+        else
+            scroll.Visible = true
+            search.Visible = true
+            TweenService:Create(rowFrame, TweenInfo.new(0.3), {
+                Size = UDim2.new(1, 0, 0, 160)
+            }):Play()
+            TweenService:Create(scroll, TweenInfo.new(0.3), {
+                Size = UDim2.new(0.65, 0, 0, 100)
+            }):Play()
+        end
+    end)
+
+    for _, setInfo in ipairs(animationSets) do
+        local button = Instance.new("TextButton")
+        button.Name = NormalizeAnimationSetName(setInfo.Name)
+        button.Size = UDim2.new(0.92, 0, 0, 20)
+        button.BackgroundTransparency = 0.92
+        button.BackgroundColor3 = Color3.fromRGB(80, 120, 200)
+        button.Text = "  " .. setInfo.Name .. "  • " .. tostring(setInfo.CategoryCount) .. "/8"
+        button.TextColor3 = Color3.fromRGB(230, 240, 255)
+        button.Font = Enum.Font.Gotham
+        button.TextSize = 9
+        button.TextXAlignment = Enum.TextXAlignment.Left
+        button.Parent = scroll
+        button:SetAttribute("AvailableCount", setInfo.CategoryCount)
+        button:SetAttribute("AvailableCategories", table.concat(setInfo.AvailableCategories, ", "))
+        Instance.new("UICorner", button).CornerRadius = UDim.new(0, 4)
+
+        button.MouseButton1Click:Connect(function()
+            toggle.Text = setInfo.Name .. " • " .. tostring(setInfo.CategoryCount) .. "/8 ▼"
+            CloseDropdown()
+            ApplyAnimationSet(setInfo)
+        end)
+    end
+
+    search:GetPropertyChangedSignal("Text"):Connect(function()
+        local searchText = NormalizeAnimationSetName(search.Text)
+
+        for _, child in ipairs(scroll:GetChildren()) do
+            if child:IsA("TextButton") then
+                child.Visible = searchText == "" or string.find(child.Name, searchText, 1, true) ~= nil
+            end
+        end
+    end)
+
+    listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        scroll.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y)
+    end)
+end
+
+-- Set Animasi selalu berada paling atas.
+CreateAnimationSetCategory(0)
 
 -- 3. Fungsi Pembuat Baris Kategori
 local function CreateAnimCategory(categoryName, data, order)
@@ -1683,6 +2112,7 @@ local function CreateAnimCategory(categoryName, data, order)
     toggle.TextSize = 9
     toggle.Parent = rowFrame
     Instance.new("UICorner", toggle).CornerRadius = UDim.new(0, 5)
+    AnimationCategoryToggles[categoryName] = toggle
 
     local search = Instance.new("TextBox")
     search.Size = UDim2.new(0.65, 0, 0, 22)
@@ -1789,7 +2219,7 @@ resetBtn.Parent = resetBtnFrame
 Instance.new("UICorner", resetBtn).CornerRadius = UDim.new(0, 8)
 
 resetBtn.MouseButton1Click:Connect(function()
-    ResetToDefaultAnimations()
+    ResetToPreviousAnimations()
 end)
 
 mainListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
@@ -2726,14 +3156,17 @@ local function CleanReapply(char)
         -- 2. Jeda yang lebih aman (Roblox butuh waktu untuk inisialisasi internal)
         task.wait(1.5) 
         
-        -- 3. Pasang ulang semua yang tersimpan
-        for category, data in pairs(SavedAnimations) do
-            if data then
-                -- Kita panggil fungsinya dengan task.spawn agar tidak saling tunggu
-                task.spawn(function()
-                    ApplyInstantAnimation(category, data)
-                end)
+        -- 3. Pasang ulang seluruh animasi dalam satu batch agar tidak terjadi race condition.
+        local hasSavedAnimation = false
+        for _, data in pairs(SavedAnimations) do
+            if data ~= nil then
+                hasSavedAnimation = true
+                break
             end
+        end
+
+        if hasSavedAnimation then
+            ApplyAnimationBatch(SavedAnimations)
         end
     end
 end
