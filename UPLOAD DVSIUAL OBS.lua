@@ -1,43 +1,93 @@
+-- ============================================================
+-- DVISUAL LICENSE SYSTEM - FIXED
+-- ============================================================
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
+local MarketplaceService = game:GetService("MarketplaceService")
 
 local player = Players.LocalPlayer
 
-
 local API_URL = "https://dvisual-api.budiksh6.workers.dev"
+local API_TOKEN = "dimskuyyy21"
+local VERSION = "1.0.1"
 
-local API_TOKEN = "dvisual_dimskuyyy21"
+-- License key tidak lagi disimpan sebagai nilai default di dalam script.
+-- Pengguna wajib memasukkannya melalui UI sebelum menu utama dibuka.
+local RuntimeEnvironment = (getgenv and getgenv()) or _G
+
+local function NormalizeLicenseKey(value)
+    return tostring(value or "")
+        :upper()
+        :gsub("%s+", "")
+end
+
+local LICENSE_KEY = ""
+RuntimeEnvironment.DVISUAL_LICENSE_KEY = nil
+
+local LICENSE_FOLDER = "DVisual"
+local LICENSE_FILE = LICENSE_FOLDER.."/license.json"
 
 
-local VERSION = "1.0.0"
+local function SaveLicenseData(data)
 
-local function APIRequest(path, data)
+    if not isfolder(LICENSE_FOLDER) then
+        makefolder(LICENSE_FOLDER)
+    end
 
-    local success, result = pcall(function()
+    writefile(
+        LICENSE_FILE,
+        HttpService:JSONEncode(data)
+    )
 
-        return request({
+end
 
-            Url = API_URL .. path,
 
-            Method = "POST",
+local function LoadLicenseData()
 
-            Headers = {
+    if not isfile(LICENSE_FILE) then
+        return nil
+    end
 
-                ["Content-Type"] = "application/json",
 
-                ["X-API-Key"] = API_TOKEN
+    local ok,result = pcall(function()
 
-            },
-
-            Body = HttpService:JSONEncode(data)
-
-        })
+        return HttpService:JSONDecode(
+            readfile(LICENSE_FILE)
+        )
 
     end)
 
 
-    if success then
+    if ok then
         return result
+    end
+
+end
+
+
+
+local function RemoveSavedLicense()
+
+    if isfile(LICENSE_FILE) then
+        delfile(LICENSE_FILE)
+    end
+
+end
+
+-- ============================================================
+-- LICENSE LOCAL STORAGE
+-- ============================================================
+
+local function LoadLicenseKey()
+
+    if isfile(LICENSE_FILE) then
+        
+        local saved = readfile(
+            LICENSE_FILE
+        )
+
+        return NormalizeLicenseKey(saved)
+
     end
 
 
@@ -45,112 +95,762 @@ local function APIRequest(path, data)
 
 end
 
-local function SendReport()
-
-    local gamename = "Unknown"
-
-    pcall(function()
-
-        gamename =
-        game:GetService("MarketplaceService")
-        :GetProductInfo(game.PlaceId).Name
-
-    end)
 
 
-    local data = {
+local function RemoveSavedLicense()
 
-        userid = player.UserId,
+    if isfile(LICENSE_FILE) then
 
-        username = player.Name,
-
-        displayname = player.DisplayName,
-
-
-        executor =
-        (identifyexecutor and identifyexecutor())
-        or "Unknown",
-
-
-        version = VERSION,
-
-
-        placeid = game.PlaceId,
-
-
-        gamename = gamename,
-
-
-        jobid = game.JobId,
-
-
-        device = "",
-
-        country = ""
-
-    }
-
-
-
-    local response =
-    APIRequest("/report", data)
-
-
-    if response then
-
-        print("[Dvisual] Report sent")
-
-    else
-
-        warn("[Dvisual] Report failed")
+        delfile(
+            LICENSE_FILE
+        )
 
     end
 
 end
 
-SendReport()
+local REQUEST_FUNCTION =
+    request
+    or http_request
+    or (syn and syn.request)
+    or (fluxus and fluxus.request)
 
--- ============================
--- HEARTBEAT SYSTEM
--- ============================
+local LicenseState = {
+    Active = false,
+    Type = "Unknown",
+    Session = nil,
+    LastError = nil
+}
 
-task.spawn(function()
+local function GetLicenseTimeLeft()
 
-    while true do
-
-        task.wait(30)
-
-
-        local success, result =
-        pcall(function()
-
-
-            return APIRequest(
-                "/heartbeat",
-                {
-
-                    userid = player.UserId
-
-                }
-            )
+    if not LicenseState.ExpireAt then
+        return "Lifetime"
+    end
 
 
-        end)
+    local expireTimestamp =
+        DateTime.fromIsoDate(LicenseState.ExpireAt).UnixTimestamp
 
 
-        if success and result then
+    local remaining =
+        expireTimestamp - os.time()
 
-            print("[Dvisual] Heartbeat OK")
 
-        else
+    if remaining <= 0 then
+        return "Expired"
+    end
 
-            warn("[Dvisual] Heartbeat Failed")
 
-        end
+    local days =
+        math.floor(remaining / 86400)
 
+
+    local hours =
+        math.floor(
+            (remaining % 86400) / 3600
+        )
+
+
+    local minutes =
+        math.floor(
+            (remaining % 3600) / 60
+        )
+
+
+    return string.format(
+        "%dD %02dH %02dM",
+        days,
+        hours,
+        minutes
+    )
+
+end
+
+local function GetRemainingTime(expire)
+
+
+    if not expire then
+        return "Unknown"
+    end
+
+
+    local ok, expireTime = pcall(function()
+    return DateTime.fromIsoDate(expire).UnixTimestamp
+	end)
+
+	if not ok then
+		return "Invalid Date"
+	end
+
+
+    local remain =
+    expireTime - os.time()
+
+
+    if remain <= 0 then
+        return "Expired"
+    end
+
+
+    local days =
+    math.floor(remain / 86400)
+
+
+    local hours =
+    math.floor((remain % 86400)/3600)
+
+
+    local minutes =
+    math.floor((remain % 3600)/60)
+
+
+    local seconds =
+    remain % 60
+
+
+    return string.format(
+        "%dd %02dh %02dm %02ds",
+        days,
+        hours,
+        minutes,
+        seconds
+    )
+
+end
+
+local function ValidateLocalLicenseKey(key)
+    if type(key) ~= "string" or key == "" then
+        return false, "License key is empty"
+    end
+
+    if #key < 8 or #key > 100 then
+        return false, "License key format is invalid"
+    end
+
+    return true
+end
+
+local function APIRequest(path, data)
+    if type(REQUEST_FUNCTION) ~= "function" then
+        return nil, "Executor does not support HTTP request"
+    end
+
+    local encodedOk, encodedBody = pcall(function()
+        return HttpService:JSONEncode(data or {})
+    end)
+
+    if not encodedOk then
+        return nil, "Failed to encode request data"
+    end
+
+    local requestOk, response = pcall(function()
+        return REQUEST_FUNCTION({
+            Url = API_URL .. path,
+            Method = "POST",
+            Headers = {
+                ["Content-Type"] = "application/json",
+                ["Accept"] = "application/json",
+                ["X-API-Key"] = API_TOKEN,
+                ["X-Dvisual-Version"] = VERSION
+            },
+            Body = encodedBody
+        })
+    end)
+
+    if not requestOk then
+        return nil, "Request failed: " .. tostring(response)
+    end
+
+    if type(response) ~= "table" then
+        return nil, "Invalid response from license server"
+    end
+
+    local statusCode = tonumber(response.StatusCode or response.Status or 0) or 0
+    if statusCode ~= 0 and (statusCode < 200 or statusCode >= 300) then
+        return nil, "License server returned HTTP " .. tostring(statusCode), statusCode
+    end
+
+    return response, nil, statusCode
+end
+
+local function DecodeAPIResponse(response)
+    if type(response) ~= "table" then
+        return nil, "Response is not a table"
+    end
+
+    local body = response.Body
+    if type(body) ~= "string" or body == "" then
+        return {}, nil
+    end
+
+    local decodeOk, decoded = pcall(function()
+        return HttpService:JSONDecode(body)
+    end)
+
+    if not decodeOk or type(decoded) ~= "table" then
+        return nil, "License server returned invalid JSON"
+    end
+
+    return decoded, nil
+end
+
+local function CheckLicense(candidateKey)
+    local normalizedKey = NormalizeLicenseKey(candidateKey)
+    local valid, validationError = ValidateLocalLicenseKey(normalizedKey)
+    if not valid then
+        LicenseState.LastError = validationError
+        warn("[Dvisual] " .. validationError)
+        return false
+    end
+
+    local response, requestError = APIRequest("/license/check", {
+        userid = player.UserId,
+        username = player.Name,
+        key = normalizedKey,
+        version = VERSION,
+        placeid = game.PlaceId,
+        jobid = game.JobId
+    })
+
+    if not response then
+        LicenseState.LastError = requestError
+        warn("[Dvisual] License check failed: " .. tostring(requestError))
+        return false
+    end
+
+    local data, decodeError = DecodeAPIResponse(response)
+    if not data then
+        LicenseState.LastError = decodeError
+        warn("[Dvisual] License check failed: " .. tostring(decodeError))
+        return false
+    end
+
+    local accepted = data.success == true or data.valid == true
+    if not accepted then
+        local serverError = tostring(data.error or data.message or "License rejected")
+        LicenseState.LastError = serverError
+        warn("[Dvisual] " .. serverError)
+        return false
+    end
+
+    LICENSE_KEY = normalizedKey
+
+	RuntimeEnvironment.DVISUAL_LICENSE_KEY = LICENSE_KEY
+
+
+	LicenseState.Expire =
+	data.expire
+
+
+
+	pcall(function()
+
+		SaveLicenseData({
+
+			key = LICENSE_KEY,
+
+			expire = data.expire,
+
+			userid = player.UserId
+
+		})
+
+	end)
+
+
+	-- simpan license lokal
+	pcall(function()
+
+		SaveLicenseKey(
+			LICENSE_KEY
+		)
+
+	end)
+    LicenseState.Active = true
+    LicenseState.Type = tostring(data.type or data.license_type or "Valid")
+    LicenseState.Session = data.session or data.session_token or data.token
+	LicenseState.ExpireAt = data.expire or data.expire_at
+    LicenseState.LastError = nil
+
+    print("[Dvisual] License accepted:", LicenseState.Type)
+    return true
+end
+
+local function SendReport()
+    if not LicenseState.Active then
+        return false
+    end
+
+    local gameName = "Unknown"
+    pcall(function()
+        gameName = MarketplaceService:GetProductInfo(game.PlaceId).Name
+    end)
+
+    local response, requestError = APIRequest("/report", {
+        userid = player.UserId,
+        username = player.Name,
+        displayname = player.DisplayName,
+        executor = (identifyexecutor and identifyexecutor()) or "Unknown",
+        version = VERSION,
+        placeid = game.PlaceId,
+        gamename = gameName,
+        jobid = game.JobId,
+        license_type = LicenseState.Type,
+        session = LicenseState.Session,
+        device = "",
+        country = ""
+    })
+
+    if not response then
+        warn("[Dvisual] Report failed: " .. tostring(requestError))
+        return false
+    end
+
+    print("[Dvisual] Report sent")
+    return true
+end
+
+-- ============================================================
+-- AUTO LICENSE LOGIN
+-- ============================================================
+
+local function TrySavedLicense()
+
+    local savedKey = LoadLicenseKey()
+
+
+    if not savedKey then
+        return false
+    end
+
+
+    print("[Dvisual] Checking saved license...")
+
+
+    local success = CheckLicense(
+        savedKey
+    )
+
+
+    if success then
+
+        print("[Dvisual] Saved license accepted")
+
+        return true
 
     end
 
+
+
+    -- kalau gagal hapus cache
+
+    RemoveSavedLicense()
+
+
+    print(
+        "[Dvisual] Saved license invalid, requesting new key"
+    )
+
+
+    return false
+
+end
+
+-- ============================================================
+-- LICENSE INPUT UI
+-- ============================================================
+local function CreateLicensePrompt()
+    local promptParent = game:GetService("CoreGui")
+
+    if gethui then
+        local ok, customParent = pcall(gethui)
+        if ok and customParent then
+            promptParent = customParent
+        end
+    end
+
+    local oldPrompt = promptParent:FindFirstChild("DvisualLicensePrompt")
+    if oldPrompt then
+        oldPrompt:Destroy()
+    end
+
+    local promptGui = Instance.new("ScreenGui")
+    promptGui.Name = "DvisualLicensePrompt"
+    promptGui.ResetOnSpawn = false
+    promptGui.IgnoreGuiInset = true
+    promptGui.DisplayOrder = 999999
+    promptGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    promptGui.Parent = promptParent
+
+    if protect_gui then
+        pcall(protect_gui, promptGui)
+    elseif syn and syn.protect_gui then
+        pcall(syn.protect_gui, promptGui)
+    end
+
+    local overlay = Instance.new("Frame")
+    overlay.Name = "Overlay"
+    overlay.Size = UDim2.fromScale(1, 1)
+    overlay.BackgroundColor3 = Color3.fromRGB(7, 9, 14)
+    overlay.BackgroundTransparency = 0.18
+    overlay.BorderSizePixel = 0
+    overlay.Active = true
+    overlay.Parent = promptGui
+
+    local panel = Instance.new("Frame")
+    panel.Name = "LicensePanel"
+    panel.AnchorPoint = Vector2.new(0.5, 0.5)
+    panel.Position = UDim2.fromScale(0.5, 0.5)
+    panel.Size = UDim2.new(0, 390, 0, 270)
+    panel.BackgroundColor3 = Color3.fromRGB(20, 24, 34)
+    panel.BorderSizePixel = 0
+    panel.Active = true
+    panel.Parent = overlay
+
+    local panelCorner = Instance.new("UICorner")
+    panelCorner.CornerRadius = UDim.new(0, 18)
+    panelCorner.Parent = panel
+
+    local panelStroke = Instance.new("UIStroke")
+    panelStroke.Color = Color3.fromRGB(92, 115, 255)
+    panelStroke.Transparency = 0.15
+    panelStroke.Thickness = 1.3
+    panelStroke.Parent = panel
+
+    local gradient = Instance.new("UIGradient")
+    gradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(27, 32, 47)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(17, 20, 29))
+    })
+    gradient.Rotation = 35
+    gradient.Parent = panel
+
+    local accent = Instance.new("Frame")
+    accent.Size = UDim2.new(1, -28, 0, 4)
+    accent.Position = UDim2.new(0, 14, 0, 12)
+    accent.BorderSizePixel = 0
+    accent.BackgroundColor3 = Color3.fromRGB(98, 119, 255)
+    accent.Parent = panel
+
+    local accentCorner = Instance.new("UICorner")
+    accentCorner.CornerRadius = UDim.new(1, 0)
+    accentCorner.Parent = accent
+
+    local accentGradient = Instance.new("UIGradient")
+    accentGradient.Color = ColorSequence.new(
+        Color3.fromRGB(98, 119, 255),
+        Color3.fromRGB(116, 225, 255)
+    )
+    accentGradient.Parent = accent
+
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Position = UDim2.new(0, 24, 0, 28)
+    titleLabel.Size = UDim2.new(1, -48, 0, 32)
+    titleLabel.Font = Enum.Font.GothamBold
+    titleLabel.Text = "Dvisual License"
+    titleLabel.TextColor3 = Color3.fromRGB(247, 249, 255)
+    titleLabel.TextSize = 21
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    titleLabel.Parent = panel
+
+    local description = Instance.new("TextLabel")
+    description.BackgroundTransparency = 1
+    description.Position = UDim2.new(0, 24, 0, 63)
+    description.Size = UDim2.new(1, -48, 0, 38)
+    description.Font = Enum.Font.GothamMedium
+    description.Text = "Masukkan license key untuk membuka Dvisual."
+    description.TextColor3 = Color3.fromRGB(172, 181, 204)
+    description.TextSize = 12
+    description.TextWrapped = true
+    description.TextXAlignment = Enum.TextXAlignment.Left
+    description.TextYAlignment = Enum.TextYAlignment.Top
+    description.Parent = panel
+
+    local keyBox = Instance.new("TextBox")
+    keyBox.Name = "KeyInput"
+    keyBox.Position = UDim2.new(0, 24, 0, 112)
+    keyBox.Size = UDim2.new(1, -48, 0, 44)
+    keyBox.BackgroundColor3 = Color3.fromRGB(31, 37, 52)
+    keyBox.BorderSizePixel = 0
+    keyBox.ClearTextOnFocus = false
+    keyBox.Font = Enum.Font.GothamSemibold
+    keyBox.PlaceholderText = "DV-XXXXXX-XXXXXX"
+    keyBox.PlaceholderColor3 = Color3.fromRGB(115, 124, 148)
+    keyBox.Text = ""
+    keyBox.TextColor3 = Color3.fromRGB(245, 247, 255)
+    keyBox.TextSize = 14
+    keyBox.TextXAlignment = Enum.TextXAlignment.Left
+    keyBox.Parent = panel
+
+    local keyPadding = Instance.new("UIPadding")
+    keyPadding.PaddingLeft = UDim.new(0, 14)
+    keyPadding.PaddingRight = UDim.new(0, 14)
+    keyPadding.Parent = keyBox
+
+    local keyCorner = Instance.new("UICorner")
+    keyCorner.CornerRadius = UDim.new(0, 11)
+    keyCorner.Parent = keyBox
+
+    local keyStroke = Instance.new("UIStroke")
+    keyStroke.Color = Color3.fromRGB(74, 88, 126)
+    keyStroke.Transparency = 0.25
+    keyStroke.Thickness = 1
+    keyStroke.Parent = keyBox
+
+    local statusLabel = Instance.new("TextLabel")
+    statusLabel.BackgroundTransparency = 1
+    statusLabel.Position = UDim2.new(0, 24, 0, 162)
+    statusLabel.Size = UDim2.new(1, -48, 0, 28)
+    statusLabel.Font = Enum.Font.GothamMedium
+    statusLabel.Text = ""
+    statusLabel.TextColor3 = Color3.fromRGB(255, 112, 112)
+    statusLabel.TextSize = 11
+    statusLabel.TextWrapped = true
+    statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+    statusLabel.Parent = panel
+
+    local submitButton = Instance.new("TextButton")
+    submitButton.Name = "Submit"
+    submitButton.Position = UDim2.new(0, 24, 1, -62)
+    submitButton.Size = UDim2.new(1, -104, 0, 38)
+    submitButton.BackgroundColor3 = Color3.fromRGB(93, 113, 255)
+    submitButton.BorderSizePixel = 0
+    submitButton.AutoButtonColor = true
+    submitButton.Font = Enum.Font.GothamBold
+    submitButton.Text = "VERIFY KEY"
+    submitButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    submitButton.TextSize = 12
+    submitButton.Parent = panel
+
+    local submitCorner = Instance.new("UICorner")
+    submitCorner.CornerRadius = UDim.new(0, 11)
+    submitCorner.Parent = submitButton
+
+    local closeButton = Instance.new("TextButton")
+    closeButton.Name = "Close"
+    closeButton.Position = UDim2.new(1, -72, 1, -62)
+    closeButton.Size = UDim2.new(0, 48, 0, 38)
+    closeButton.BackgroundColor3 = Color3.fromRGB(45, 51, 68)
+    closeButton.BorderSizePixel = 0
+    closeButton.AutoButtonColor = true
+    closeButton.Font = Enum.Font.GothamBold
+    closeButton.Text = "X"
+    closeButton.TextColor3 = Color3.fromRGB(220, 225, 238)
+    closeButton.TextSize = 13
+    closeButton.Parent = panel
+
+    local closeCorner = Instance.new("UICorner")
+    closeCorner.CornerRadius = UDim.new(0, 11)
+    closeCorner.Parent = closeButton
+
+    local resultEvent = Instance.new("BindableEvent")
+    local verifying = false
+    local closed = false
+
+    local function SetBusy(isBusy)
+        verifying = isBusy
+        keyBox.TextEditable = not isBusy
+        submitButton.Active = not isBusy
+        submitButton.AutoButtonColor = not isBusy
+        submitButton.Text = isBusy and "VERIFYING..." or "VERIFY KEY"
+        submitButton.BackgroundColor3 = isBusy
+            and Color3.fromRGB(65, 73, 105)
+            or Color3.fromRGB(93, 113, 255)
+    end
+
+    local function SubmitKey()
+        if verifying or closed then
+            return
+        end
+
+        local enteredKey = NormalizeLicenseKey(keyBox.Text)
+        keyBox.Text = enteredKey
+
+        local localValid, localError = ValidateLocalLicenseKey(enteredKey)
+        if not localValid then
+            statusLabel.TextColor3 = Color3.fromRGB(255, 112, 112)
+            statusLabel.Text = tostring(localError)
+            return
+        end
+
+        SetBusy(true)
+        statusLabel.TextColor3 = Color3.fromRGB(166, 190, 255)
+        statusLabel.Text = "Menghubungkan ke license server..."
+
+        task.spawn(function()
+            local accepted = CheckLicense(enteredKey)
+
+            if accepted then
+                statusLabel.TextColor3 = Color3.fromRGB(105, 231, 155)
+                statusLabel.Text = "Key valid. Membuka Dvisual..."
+                task.wait(0.45)
+
+                if not closed then
+                    closed = true
+                    resultEvent:Fire(true)
+                end
+            else
+                SetBusy(false)
+                statusLabel.TextColor3 = Color3.fromRGB(255, 112, 112)
+                statusLabel.Text = tostring(LicenseState.LastError or "License key ditolak")
+                keyBox:CaptureFocus()
+            end
+        end)
+    end
+
+    submitButton.MouseButton1Click:Connect(SubmitKey)
+    keyBox.FocusLost:Connect(function(enterPressed)
+        if enterPressed then
+            SubmitKey()
+        end
+    end)
+
+    closeButton.MouseButton1Click:Connect(function()
+        if closed then return end
+        closed = true
+        LicenseState.LastError = "License prompt closed by user"
+        resultEvent:Fire(false)
+    end)
+
+    task.defer(function()
+        if keyBox.Parent then
+            keyBox:CaptureFocus()
+        end
+    end)
+
+    local accepted = resultEvent.Event:Wait()
+    resultEvent:Destroy()
+    promptGui:Destroy()
+    return accepted == true
+end
+
+-- ============================================================
+-- LICENSE GATE
+-- ============================================================
+
+
+local licenseAccepted = false
+
+
+local saved = LoadLicenseData()
+
+
+if saved then
+
+    print("[Dvisual] Checking saved license")
+
+    print(
+        "Remaining:",
+        GetRemainingTime(saved.expire)
+    )
+
+
+    licenseAccepted =
+    CheckLicense(saved.key)
+
+
+end
+
+
+
+if not licenseAccepted then
+
+    licenseAccepted =
+    CreateLicensePrompt()
+
+end
+
+
+
+if not licenseAccepted then
+
+    warn(
+    "[Dvisual] Access Denied"
+    )
+
+    return
+
+end
+
+task.spawn(SendReport)
+
+
+-- ============================================================
+-- LICENSE HEARTBEAT
+-- ============================================================
+local HeartbeatRunning = true
+local ConsecutiveHeartbeatFailures = 0
+local MAX_HEARTBEAT_FAILURES = 5
+
+local function StopLicenseHeartbeat()
+    HeartbeatRunning = false
+end
+
+RuntimeEnvironment.DVISUAL_STOP_LICENSE_HEARTBEAT = StopLicenseHeartbeat
+
+task.spawn(function()
+    while HeartbeatRunning and LicenseState.Active do
+        task.wait(30)
+
+        if not HeartbeatRunning or not LicenseState.Active then
+            break
+        end
+
+        local response, requestError, statusCode = APIRequest("/heartbeat", {
+            userid = player.UserId,
+            key = LICENSE_KEY,
+            session = LicenseState.Session,
+            version = VERSION,
+            placeid = game.PlaceId,
+            jobid = game.JobId
+        })
+
+        if not response then
+            ConsecutiveHeartbeatFailures = ConsecutiveHeartbeatFailures + 1
+            warn(
+                "[Dvisual] Heartbeat failed ("
+                .. tostring(ConsecutiveHeartbeatFailures)
+                .. "/"
+                .. tostring(MAX_HEARTBEAT_FAILURES)
+                .. "): "
+                .. tostring(requestError)
+            )
+
+            -- HTTP 401/403 berarti akses memang ditolak, bukan sekadar jaringan putus.
+            if statusCode == 401 or statusCode == 403 then
+                LicenseState.Active = false
+                LicenseState.LastError = requestError
+                break
+            end
+        else
+            local heartbeatData = DecodeAPIResponse(response)
+
+            if type(heartbeatData) == "table"
+                and (heartbeatData.success == false or heartbeatData.valid == false) then
+                LicenseState.Active = false
+                LicenseState.LastError = tostring(
+                    heartbeatData.error
+                    or heartbeatData.message
+                    or "License heartbeat rejected"
+                )
+                warn("[Dvisual] " .. LicenseState.LastError)
+                break
+            end
+
+            ConsecutiveHeartbeatFailures = 0
+            print("[Dvisual] Heartbeat OK")
+        end
+
+        -- Kegagalan jaringan berulang menghentikan heartbeat, tetapi tidak membuat loop tak terbatas.
+        if ConsecutiveHeartbeatFailures >= MAX_HEARTBEAT_FAILURES then
+            warn("[Dvisual] Heartbeat stopped after repeated connection failures")
+            break
+        end
+    end
+
+    HeartbeatRunning = false
 end)
 
 local oldGui = game:GetService("CoreGui"):FindFirstChild("DvisualUI_Final")
@@ -172,12 +872,18 @@ local FollowConnection = nil
 local Headsitting = false
 local HeadsitConnection = nil
 local Flying = false
-local FlySpeed = 50 -- Ini nilai default yang akan diubah oleh UI
+local FlySpeed = 50 -- Nilai awal; dapat diubah lewat UI
 local FlyConnection = nil
+local FlyShortcutConnection = nil
+local FlyHumanoidDiedConnection = nil
+local BodyGyro = nil
+local BodyVelocity = nil
+local PreviousFlyHumanoidState = nil
 
 local SavedAnimations = {
     ["Idle"] = nil, ["Walk"] = nil, ["Run"] = nil,
-    ["Jump"] = nil, ["Fall"] = nil, ["Climb"] = nil, ["Swim"] = nil
+    ["Jump"] = nil, ["Fall"] = nil, ["Climb"] = nil,
+    ["SwimIdle"] = nil, ["Swim"] = nil
 }
 
 local AnimationData = {
@@ -259,7 +965,7 @@ title.Parent = main
 title.Size = UDim2.new(1, -100, 0, 45)
 title.Position = UDim2.new(0, 15, 0, 0)
 title.BackgroundTransparency = 1
-title.Text = "🔥 Dvisual by Udin"
+title.Text = "🔥 Dvisual V2 by Udin"
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 18
@@ -319,6 +1025,7 @@ local avatarTabFrame = CreateTabFrame("Avatar", false)
 local animTabFrame = CreateTabFrame("Animation", false) 
 local characterTabFrame = CreateTabFrame("Character", false)
 local movementTabFrame = CreateTabFrame("Movement", false)
+movementTabFrame.ClipsDescendants = true
 
 local function showTab(tabName)
     infoTabFrame.Visible = (tabName == "Info")
@@ -391,6 +1098,62 @@ CreateInfoLabel("Account Age: " .. player.AccountAge .. " Days")
 CreateInfoLabel("Join Date: " .. GetJoinDate()) -- Menampilkan Join Date
 CreateInfoLabel("Game: " .. gName)
 
+-- ============================================================
+-- LICENSE TIME INFO
+-- ============================================================
+
+local licenseTimeInfo = Instance.new("TextLabel")
+licenseTimeInfo.Parent = infoTabFrame
+licenseTimeInfo.Size = UDim2.new(1,0,0,25)
+licenseTimeInfo.BackgroundTransparency = 1
+licenseTimeInfo.Text = " • License: Calculating..."
+licenseTimeInfo.TextColor3 = Color3.fromRGB(105,231,155)
+licenseTimeInfo.Font = Enum.Font.GothamBold
+licenseTimeInfo.TextSize = 12
+licenseTimeInfo.TextXAlignment = Enum.TextXAlignment.Left
+
+
+task.spawn(function()
+
+    while licenseTimeInfo.Parent do
+
+        local expire =
+            LicenseState.ExpireAt
+            or LicenseState.Expire
+
+
+        local remaining =
+            GetRemainingTime(expire)
+
+
+        licenseTimeInfo.Text =
+            " • License Time: "..remaining
+
+
+        if remaining == "Expired" then
+
+            licenseTimeInfo.TextColor3 =
+                Color3.fromRGB(255,100,100)
+
+        elseif remaining == "Lifetime" then
+
+            licenseTimeInfo.TextColor3 =
+                Color3.fromRGB(100,180,255)
+
+        else
+
+            licenseTimeInfo.TextColor3 =
+                Color3.fromRGB(105,231,155)
+
+        end
+
+
+        task.wait(1)
+
+    end
+
+end)
+
 local function BorrowSelectedPlayerAvatar(targetUsername)
     local targetPlayer = Players:FindFirstChild(targetUsername)
     if targetPlayer then
@@ -441,15 +1204,44 @@ end
 
 --- --- 🔹 ISI TAB HOME 🔹 --- ---
 local function AddScriptButton(name, callback, parent)
+    local targetParent = parent or homeTabFrame
     local btn = Instance.new("TextButton")
-    btn.Parent = parent or homeTabFrame
-    btn.Size = UDim2.new(0, 0, 0, 30)
+    btn.Parent = targetParent
+
+    -- Tombol sebelumnya memiliki lebar 0 pixel. Teksnya masih terlihat,
+    -- tetapi area kliknya tidak ada dan teks meluber ke sidebar.
+    -- Ukuran diatur berdasarkan layout parent agar selalu berada di tengah
+    -- dan mempunyai area klik yang benar.
+    local gridLayout = targetParent:FindFirstChildOfClass("UIGridLayout")
+    local listLayout = targetParent:FindFirstChildOfClass("UIListLayout")
+
+    if gridLayout then
+        -- UIGridLayout akan menentukan ukuran final tombol.
+        btn.Size = UDim2.new(1, 0, 1, 0)
+    elseif listLayout and listLayout.FillDirection == Enum.FillDirection.Horizontal then
+        -- Container aksi Avatar berisi tiga tombol horizontal.
+        btn.Size = UDim2.new(1 / 3, -4, 1, 0)
+    elseif targetParent == movementTabFrame then
+        -- Beri margin kiri/kanan agar tombol Movement rapi dan terpusat.
+        btn.Size = UDim2.new(1, -8, 0, 34)
+    else
+        btn.Size = UDim2.new(1, 0, 0, 30)
+    end
+
     btn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     btn.BackgroundTransparency = 0.92
     btn.Text = name
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
     btn.Font = Enum.Font.GothamSemibold
     btn.TextSize = 13
+    btn.TextXAlignment = Enum.TextXAlignment.Center
+    btn.TextYAlignment = Enum.TextYAlignment.Center
+    btn.TextWrapped = true
+    btn.AutoButtonColor = true
+    btn.Active = true
+    btn.Selectable = true
+    btn.ZIndex = 3
+
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
     btn.MouseButton1Click:Connect(callback)
     return btn
@@ -1485,95 +2277,523 @@ local AnimationData = {
 			}
 		}
 
---- --- 🔹 FUNGSI APPLY UNIVERSAL (SMART DETECTION) 🔹 --- ---
+--- --- 🔹 FUNGSI APPLY UNIVERSAL + SET ANIMASI 🔹 --- ---
 
-local function ApplyInstantAnimation(category, data)
+-- Urutan kategori yang dipakai oleh dropdown biasa dan Set Animasi.
+local CategoryOrder = {"Idle", "Walk", "Run", "Jump", "Fall", "Climb", "SwimIdle", "Swim"}
+
+-- Referensi tombol kategori agar teksnya ikut berubah saat sebuah set diterapkan.
+local AnimationCategoryToggles = {}
+local AnimationSetToggle = nil
+
+-- Snapshot animasi yang dipakai karakter sebelum Dvisual menggantinya.
+-- Snapshot ini hanya diambil satu kali, tepat sebelum perubahan animasi pertama.
+local PreviousAnimations = {}
+local HasCapturedPreviousAnimations = false
+
+-- Nama child Animation tidak wajib sama pada semua versi Animate,
+-- tetapi nama-nama ini mengikuti struktur Animate Roblox yang umum.
+local AnimationObjectNames = {
+    Idle = "Animation1",
+    Walk = "WalkAnim",
+    Run = "RunAnim",
+    Jump = "JumpAnim",
+    Fall = "FallAnim",
+    Climb = "ClimbAnim",
+    SwimIdle = "SwimIdle",
+    Swim = "Swim"
+}
+
+local function GetAnimationFolderName(category)
+    return category == "Idle" and "idle" or category:lower()
+end
+
+local function CopyAnimationValue(value)
+    if type(value) ~= "table" then
+        return value
+    end
+
+    local copied = {}
+    for index, item in ipairs(value) do
+        copied[index] = item
+    end
+    return copied
+end
+
+local function CopyAnimationMap(source)
+    local copied = {}
+    for _, category in ipairs(CategoryOrder) do
+        if source[category] ~= nil then
+            copied[category] = CopyAnimationValue(source[category])
+        end
+    end
+    return copied
+end
+
+local function ExtractAnimationId(animationId)
+    local value = tostring(animationId or "")
+    return value:match("(%d+)")
+end
+
+local function ReadAnimationCategory(animateScript, category)
+    local folder = animateScript:FindFirstChild(GetAnimationFolderName(category))
+    if not folder then
+        return nil
+    end
+
+    local preferredName = AnimationObjectNames[category] or "Animation1"
+    local entries = {}
+
+    for _, child in ipairs(folder:GetChildren()) do
+        if child:IsA("Animation") then
+            local id = ExtractAnimationId(child.AnimationId)
+            if id then
+                table.insert(entries, {
+                    Id = id,
+                    Name = child.Name
+                })
+            end
+        end
+    end
+
+    table.sort(entries, function(a, b)
+        local function GetRank(entry)
+            if entry.Name == preferredName then
+                return 1
+            end
+
+            local number = tonumber(entry.Name:match("^Animation(%d+)$"))
+            if number then
+                return number
+            end
+
+            return 999
+        end
+
+        local rankA = GetRank(a)
+        local rankB = GetRank(b)
+
+        if rankA ~= rankB then
+            return rankA < rankB
+        end
+
+        return a.Name < b.Name
+    end)
+
+    if #entries == 0 then
+        return nil
+    end
+
+    if #entries == 1 then
+        return entries[1].Id
+    end
+
+    local ids = {}
+    for index, entry in ipairs(entries) do
+        ids[index] = entry.Id
+    end
+    return ids
+end
+
+local function CapturePreviousAnimations(animateScript)
+    if HasCapturedPreviousAnimations or not animateScript then
+        return HasCapturedPreviousAnimations
+    end
+
+    local capturedCount = 0
+    local snapshot = {}
+
+    for _, category in ipairs(CategoryOrder) do
+        local data = ReadAnimationCategory(animateScript, category)
+        if data ~= nil then
+            snapshot[category] = data
+            capturedCount = capturedCount + 1
+        end
+    end
+
+    if capturedCount > 0 then
+        PreviousAnimations = snapshot
+        HasCapturedPreviousAnimations = true
+        return true
+    end
+
+    return false
+end
+
+local function ConfigureAnimationCategory(animateClone, category, data)
+    local folderName = GetAnimationFolderName(category)
+    local targetFolder = animateClone:FindFirstChild(folderName)
+
+    if not targetFolder or data == nil then
+        return false
+    end
+
+    targetFolder:ClearAllChildren()
+
+    local firstAnimationName = AnimationObjectNames[category] or "Animation1"
+
+    local function CreateEntry(id, name)
+        if id == nil then return end
+
+        local animation = Instance.new("Animation")
+        animation.Name = name
+        animation.AnimationId = "rbxassetid://" .. tostring(id)
+        animation.Parent = targetFolder
+
+        -- Dipertahankan agar kompatibel dengan struktur script sebelumnya.
+        local value = Instance.new("StringValue")
+        value.Name = name
+        value.Value = tostring(id)
+        value.Parent = targetFolder
+    end
+
+    if type(data) == "table" then
+        for index, id in ipairs(data) do
+            local entryName = index == 1 and firstAnimationName or ("Animation" .. index)
+            CreateEntry(id, entryName)
+        end
+    else
+        CreateEntry(data, firstAnimationName)
+    end
+
+    if category == "Idle" then
+        local firstIdle = targetFolder:FindFirstChild(firstAnimationName)
+        if firstIdle and firstIdle:IsA("Animation") then
+            local weight1 = Instance.new("NumberValue")
+            weight1.Name = "Weight"
+            weight1.Value = 9
+            weight1.Parent = firstIdle
+        end
+
+        local secondIdle = targetFolder:FindFirstChild("Animation2")
+        if secondIdle and secondIdle:IsA("Animation") then
+            local weight2 = Instance.new("NumberValue")
+            weight2.Name = "Weight"
+            weight2.Value = 1
+            weight2.Parent = secondIdle
+        end
+    end
+
+    return true
+end
+
+-- Memasang satu atau banyak kategori hanya dengan satu kali clone/refresh Animate.
+-- Ini lebih stabil daripada menghancurkan Animate delapan kali secara berurutan.
+local function ApplyAnimationBatch(animationMap)
     local char = player.Character
     local animate = char and char:FindFirstChild("Animate")
     local humanoid = char and char:FindFirstChildOfClass("Humanoid")
-    
-    if animate and humanoid then
-        SavedAnimations[category] = data
-        local folderName = category == "Idle" and "idle" or category:lower()
-        
-        -- Gunakan Clone untuk memastikan script membaca ulang ID baru
-        local animateClone = animate:Clone()
-        local targetFolder = animateClone:FindFirstChild(folderName)
-        
-        if targetFolder then
-            targetFolder:ClearAllChildren()
-            
-            local animName = "Animation1"
-            if folderName == "jump" then animName = "JumpAnim"
-            elseif folderName == "fall" then animName = "FallAnim" end
 
-            local function CreateEntry(id, name, parent)
-                local a = Instance.new("Animation")
-                a.Name = name; a.AnimationId = "rbxassetid://"..id; a.Parent = parent
-                local v = Instance.new("StringValue")
-                v.Name = name; v.Parent = parent
-            end
+    if not animate or not humanoid then
+        ShowNotification("Character or Animate is not ready.")
+        return false
+    end
 
-            if type(data) == "table" then
-				for i, id in ipairs(data) do
-					CreateEntry(id, (i == 1 and animName) or ("Animation"..i), targetFolder)
-				end
-			else
-				CreateEntry(data, animName, targetFolder)
-			end
+    -- Simpan animasi awal sebelum perubahan pertama dilakukan.
+    CapturePreviousAnimations(animate)
 
-			-- POINT 3 & 4 TARUH DI SINI
-			if folderName == "idle" then
-				if targetFolder:FindFirstChild("Animation1") then
-					local w1 = Instance.new("NumberValue")
-					w1.Name = "Weight"
-					w1.Value = 9
-					w1.Parent = targetFolder.Animation1
-				end
+    local animateClone = animate:Clone()
+    local appliedCount = 0
 
-				if targetFolder:FindFirstChild("Animation2") then
-					local w2 = Instance.new("NumberValue")
-					w2.Name = "Weight"
-					w2.Value = 1
-					w2.Parent = targetFolder.Animation2
-				end
-			end
-
-            -- Hancurkan yang lama dan pasang yang baru (Nuclear Refresh)
-            animate:Destroy()
-            for _, track in pairs(humanoid:GetPlayingAnimationTracks()) do track:Stop(0) end
-            animateClone.Parent = char
-            
-            -- Trigger fisik
-            humanoid:ChangeState(Enum.HumanoidStateType.Landing)
-            local s = humanoid.WalkSpeed; humanoid.WalkSpeed = 0; task.wait(0.05); humanoid.WalkSpeed = s
+    for _, category in ipairs(CategoryOrder) do
+        local data = animationMap[category]
+        if data ~= nil and ConfigureAnimationCategory(animateClone, category, data) then
+            SavedAnimations[category] = data
+            appliedCount = appliedCount + 1
         end
     end
-end
 
-local function ResetToDefaultAnimations()
-    local char = player.Character
-    if not char then return end
-    
-    local humanoid = char:FindFirstChildOfClass("Humanoid")
-    local animate = char:FindFirstChild("Animate")
-
-    -- 1. Kosongkan memori SavedAnimations agar tidak otomatis terpasang lagi saat respawn
-    for k, v in pairs(SavedAnimations) do 
-        SavedAnimations[k] = nil 
+    if appliedCount == 0 then
+        animateClone:Destroy()
+        return false
     end
 
-    -- 2. RESET TOTAL: Menggunakan LoadCharacter
-    -- Ini adalah satu-satunya cara paling stabil di Roblox untuk mengembalikan 
-    -- semua animasi bundle (Ninja, Mage, Old School, dll) secara instan.
-    player:LoadCharacter()
-    
-    -- Notifikasi Sukses
-    ShowNotification("Animations Reset to Avatar Default!")
+    animate:Destroy()
+
+    for _, track in ipairs(humanoid:GetPlayingAnimationTracks()) do
+        track:Stop(0)
+    end
+
+    animateClone.Parent = char
+
+    -- Memaksa Animate membaca konfigurasi baru.
+    humanoid:ChangeState(Enum.HumanoidStateType.Landing)
+    local oldWalkSpeed = humanoid.WalkSpeed
+    humanoid.WalkSpeed = 0
+    task.wait(0.05)
+    humanoid.WalkSpeed = oldWalkSpeed
+
+    return true, appliedCount
 end
 
--- Urutan Tampilan
-local CategoryOrder = {"Idle", "Walk", "Run", "Jump", "Fall", "Climb","SwimIdle", "Swim"}
+local function ApplyInstantAnimation(category, data)
+    return ApplyAnimationBatch({[category] = data})
+end
+
+-- Normalisasi nama membuat "SuperHero" dan "Superhero" dianggap set yang sama,
+-- serta mengabaikan spasi/tab yang tidak sengaja ada di AnimationData.
+local function NormalizeAnimationSetName(name)
+    return tostring(name)
+        :lower()
+        :gsub("%s+", " ")
+        :match("^%s*(.-)%s*$")
+end
+
+-- Membentuk SEMUA set secara otomatis langsung dari AnimationData.
+-- Set tidak wajib lengkap. Jika sebuah kategori tidak tersedia, kategori itu
+-- tidak akan diubah ketika set dipilih dan tetap memakai animasi sebelumnya.
+local function BuildAllAnimationSets()
+    local indexedSets = {}
+
+    for _, category in ipairs(CategoryOrder) do
+        for realName, animationData in pairs(AnimationData[category] or {}) do
+            local normalizedName = NormalizeAnimationSetName(realName)
+            local setInfo = indexedSets[normalizedName]
+
+            if not setInfo then
+                setInfo = {
+                    Name = tostring(realName):match("^%s*(.-)%s*$"),
+                    Animations = {},
+                    SourceNames = {},
+                    CategoryCount = 0,
+                    AvailableCategories = {}
+                }
+                indexedSets[normalizedName] = setInfo
+            end
+
+            -- Hindari penambahan hitungan dua kali jika ada nama duplikat
+            -- pada kategori yang sama.
+            if setInfo.Animations[category] == nil then
+                setInfo.CategoryCount = setInfo.CategoryCount + 1
+                table.insert(setInfo.AvailableCategories, category)
+            end
+
+            setInfo.Animations[category] = animationData
+            setInfo.SourceNames[category] = realName
+        end
+    end
+
+    local allSets = {}
+
+    for _, setInfo in pairs(indexedSets) do
+        table.sort(setInfo.AvailableCategories, function(a, b)
+            local ai = table.find(CategoryOrder, a) or 999
+            local bi = table.find(CategoryOrder, b) or 999
+            return ai < bi
+        end)
+        table.insert(allSets, setInfo)
+    end
+
+    table.sort(allSets, function(a, b)
+        -- Set lengkap ditaruh lebih dahulu, lalu diurutkan berdasarkan nama.
+        if a.CategoryCount ~= b.CategoryCount then
+            return a.CategoryCount > b.CategoryCount
+        end
+        return a.Name:lower() < b.Name:lower()
+    end)
+
+    return allSets
+end
+
+local function ApplyAnimationSet(setInfo)
+    if not setInfo or not setInfo.Animations then
+        ShowNotification("Animation set is invalid.")
+        return
+    end
+
+    local success, appliedCount = ApplyAnimationBatch(setInfo.Animations)
+
+    if success then
+        for _, category in ipairs(CategoryOrder) do
+            -- Hanya perbarui kategori yang benar-benar tersedia pada set.
+            -- Kategori yang tidak ada tetap memakai pilihan sebelumnya.
+            if setInfo.Animations[category] ~= nil then
+                local toggle = AnimationCategoryToggles[category]
+                if toggle then
+                    local sourceName = setInfo.SourceNames[category] or setInfo.Name
+                    toggle.Text = sourceName .. " ▼"
+                end
+            end
+        end
+
+        ShowNotification(setInfo.Name .. " set applied (" .. tostring(appliedCount) .. "/8 available)!")
+    else
+        ShowNotification("Failed to apply animation set.")
+    end
+end
+
+local function ResetToPreviousAnimations()
+    local char = player.Character
+    local animate = char and char:FindFirstChild("Animate")
+
+    -- Jika belum pernah mengganti animasi, ambil kondisi yang sedang dipakai sekarang.
+    if not HasCapturedPreviousAnimations and animate then
+        CapturePreviousAnimations(animate)
+    end
+
+    if not HasCapturedPreviousAnimations or next(PreviousAnimations) == nil then
+        ShowNotification("Previous animations were not found.")
+        return
+    end
+
+    -- Hapus pilihan custom lama terlebih dahulu agar kategori yang tersimpan
+    -- benar-benar kembali ke snapshot sebelum Dvisual melakukan perubahan.
+    for _, category in ipairs(CategoryOrder) do
+        SavedAnimations[category] = nil
+    end
+
+    local success, restoredCount = ApplyAnimationBatch(CopyAnimationMap(PreviousAnimations))
+
+    if success then
+        if AnimationSetToggle then
+            AnimationSetToggle.Text = "Previous Animations Restored ▼"
+        end
+
+        for _, category in ipairs(CategoryOrder) do
+            local toggle = AnimationCategoryToggles[category]
+            if toggle then
+                if PreviousAnimations[category] ~= nil then
+                    toggle.Text = "Previous " .. category .. " ▼"
+                else
+                    toggle.Text = "Select " .. category .. " ▼"
+                end
+            end
+        end
+
+        ShowNotification("Previous animations restored (" .. tostring(restoredCount) .. "/8)!")
+    else
+        ShowNotification("Failed to restore previous animations.")
+    end
+end
+
+-- Baris dropdown SET ANIMASI. Semua paket, termasuk yang tidak lengkap, diambil otomatis dari AnimationData.
+local function CreateAnimationSetCategory(order)
+    local animationSets = BuildAllAnimationSets()
+
+    local rowFrame = Instance.new("Frame")
+    rowFrame.Name = "AnimationSetRow"
+    rowFrame.Size = UDim2.new(1, 0, 0, 30)
+    rowFrame.BackgroundTransparency = 1
+    rowFrame.LayoutOrder = order
+    rowFrame.Parent = animTabContent
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.3, 0, 0, 30)
+    label.Text = "SET ANIMASI"
+    label.TextColor3 = Color3.fromRGB(120, 190, 255)
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = 11
+    label.BackgroundTransparency = 1
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = rowFrame
+
+    local toggle = Instance.new("TextButton")
+    toggle.Size = UDim2.new(0.65, 0, 0, 24)
+    toggle.Position = UDim2.new(0.35, 0, 0, 3)
+    toggle.BackgroundColor3 = Color3.fromRGB(55, 80, 130)
+    toggle.Text = "Select Animation Set (" .. tostring(#animationSets) .. ") ▼"
+    toggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    toggle.Font = Enum.Font.GothamSemibold
+    toggle.TextSize = 9
+    toggle.Parent = rowFrame
+    Instance.new("UICorner", toggle).CornerRadius = UDim.new(0, 5)
+    AnimationSetToggle = toggle
+
+    local search = Instance.new("TextBox")
+    search.Size = UDim2.new(0.65, 0, 0, 22)
+    search.Position = UDim2.new(0.35, 0, 0, 32)
+    search.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    search.PlaceholderText = "🔍 Search all animation sets..."
+    search.Text = ""
+    search.TextColor3 = Color3.fromRGB(255, 255, 255)
+    search.Font = Enum.Font.Gotham
+    search.TextSize = 9
+    search.Visible = false
+    search.Parent = rowFrame
+    Instance.new("UICorner", search).CornerRadius = UDim.new(0, 5)
+
+    local scroll = Instance.new("ScrollingFrame")
+    scroll.Size = UDim2.new(0.65, 0, 0, 0)
+    scroll.Position = UDim2.new(0.35, 0, 0, 56)
+    scroll.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    scroll.BorderSizePixel = 0
+    scroll.ScrollBarThickness = 2
+    scroll.Visible = false
+    scroll.Parent = rowFrame
+    Instance.new("UICorner", scroll).CornerRadius = UDim.new(0, 5)
+
+    local listLayout = Instance.new("UIListLayout")
+    listLayout.Parent = scroll
+    listLayout.Padding = UDim.new(0, 2)
+    listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+    local function CloseDropdown()
+        search.Visible = false
+        TweenService:Create(scroll, TweenInfo.new(0.2), {
+            Size = UDim2.new(0.65, 0, 0, 0)
+        }):Play()
+        TweenService:Create(rowFrame, TweenInfo.new(0.2), {
+            Size = UDim2.new(1, 0, 0, 30)
+        }):Play()
+        task.wait(0.2)
+        scroll.Visible = false
+    end
+
+    toggle.MouseButton1Click:Connect(function()
+        if scroll.Visible then
+            CloseDropdown()
+        else
+            scroll.Visible = true
+            search.Visible = true
+            TweenService:Create(rowFrame, TweenInfo.new(0.3), {
+                Size = UDim2.new(1, 0, 0, 160)
+            }):Play()
+            TweenService:Create(scroll, TweenInfo.new(0.3), {
+                Size = UDim2.new(0.65, 0, 0, 100)
+            }):Play()
+        end
+    end)
+
+    for _, setInfo in ipairs(animationSets) do
+        local button = Instance.new("TextButton")
+        button.Name = NormalizeAnimationSetName(setInfo.Name)
+        button.Size = UDim2.new(0.92, 0, 0, 20)
+        button.BackgroundTransparency = 0.92
+        button.BackgroundColor3 = Color3.fromRGB(80, 120, 200)
+        button.Text = "  " .. setInfo.Name .. "  • " .. tostring(setInfo.CategoryCount) .. "/8"
+        button.TextColor3 = Color3.fromRGB(230, 240, 255)
+        button.Font = Enum.Font.Gotham
+        button.TextSize = 9
+        button.TextXAlignment = Enum.TextXAlignment.Left
+        button.Parent = scroll
+        button:SetAttribute("AvailableCount", setInfo.CategoryCount)
+        button:SetAttribute("AvailableCategories", table.concat(setInfo.AvailableCategories, ", "))
+        Instance.new("UICorner", button).CornerRadius = UDim.new(0, 4)
+
+        button.MouseButton1Click:Connect(function()
+            toggle.Text = setInfo.Name .. " • " .. tostring(setInfo.CategoryCount) .. "/8 ▼"
+            CloseDropdown()
+            ApplyAnimationSet(setInfo)
+        end)
+    end
+
+    search:GetPropertyChangedSignal("Text"):Connect(function()
+        local searchText = NormalizeAnimationSetName(search.Text)
+
+        for _, child in ipairs(scroll:GetChildren()) do
+            if child:IsA("TextButton") then
+                child.Visible = searchText == "" or string.find(child.Name, searchText, 1, true) ~= nil
+            end
+        end
+    end)
+
+    listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        scroll.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y)
+    end)
+end
+
+-- Set Animasi selalu berada paling atas.
+CreateAnimationSetCategory(0)
 
 -- 3. Fungsi Pembuat Baris Kategori
 local function CreateAnimCategory(categoryName, data, order)
@@ -1604,6 +2824,7 @@ local function CreateAnimCategory(categoryName, data, order)
     toggle.TextSize = 9
     toggle.Parent = rowFrame
     Instance.new("UICorner", toggle).CornerRadius = UDim.new(0, 5)
+    AnimationCategoryToggles[categoryName] = toggle
 
     local search = Instance.new("TextBox")
     search.Size = UDim2.new(0.65, 0, 0, 22)
@@ -1710,7 +2931,7 @@ resetBtn.Parent = resetBtnFrame
 Instance.new("UICorner", resetBtn).CornerRadius = UDim.new(0, 8)
 
 resetBtn.MouseButton1Click:Connect(function()
-    ResetToDefaultAnimations()
+    ResetToPreviousAnimations()
 end)
 
 mainListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
@@ -2185,16 +3406,77 @@ followBtn.MouseButton1Click:Connect(function()
 end)
 
 -- --- 🔹 ISI TAB MOVEMENT 🔹 ---
-local function CreateMovementSetting(name, min, max, default, callback)
+-- Semua state movement disimpan dalam satu tempat agar Reset Movement,
+-- Fly, dan respawn tidak saling menimpa.
+local StopFlying
+local SetAvaLight
+local ApplyAvaLightToCharacter
+local CleanupMovementFeatures
+local ResetMovement
+
+local MovementControls = {}
+
+-- Pusatkan seluruh elemen tab Movement. Elemen tetap memakai lebar penuh
+-- dengan sedikit margin sehingga tidak masuk ke area sidebar.
+local movementLayout = movementTabFrame and movementTabFrame:FindFirstChildOfClass("UIListLayout")
+if movementLayout then
+    movementLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    movementLayout.VerticalAlignment = Enum.VerticalAlignment.Top
+    movementLayout.Padding = UDim.new(0, 8)
+end
+
+local MovementDefaults = {
+    Captured = false,
+    WalkSpeed = 16,
+    UseJumpPower = true,
+    JumpPower = 50,
+    JumpHeight = 7.2,
+    FlySpeed = FlySpeed
+}
+
+local function CaptureMovementDefaults(character, force)
+    local hum = character and character:FindFirstChildOfClass("Humanoid")
+    if not hum then
+        return false
+    end
+
+    if force or not MovementDefaults.Captured then
+        MovementDefaults.WalkSpeed = hum.WalkSpeed
+        MovementDefaults.UseJumpPower = hum.UseJumpPower
+        MovementDefaults.JumpPower = hum.JumpPower
+        MovementDefaults.JumpHeight = hum.JumpHeight
+
+        -- FlySpeed bukan properti Humanoid, jadi baseline-nya cukup disimpan sekali.
+        if not MovementDefaults.Captured then
+            MovementDefaults.FlySpeed = FlySpeed
+        end
+
+        MovementDefaults.Captured = true
+    end
+
+    return true
+end
+
+CaptureMovementDefaults(player.Character, true)
+
+local function UpdateMovementControl(controlName, value)
+    local control = MovementControls[controlName]
+    if not control then return end
+
+    control.Input.Text = tostring(value)
+    control.Label.Text = control.DisplayName .. " [" .. tostring(value) .. "]"
+end
+
+local function CreateMovementSetting(name, minValue, maxValue, defaultValue, callback)
     local container = Instance.new("Frame")
     container.Parent = movementTabFrame
-    container.Size = UDim2.new(1, 0, 0, 50)
+    container.Size = UDim2.new(1, -8, 0, 50)
     container.BackgroundTransparency = 1
 
     local label = Instance.new("TextLabel")
     label.Parent = container
     label.Size = UDim2.new(1, 0, 0, 20)
-    label.Text = name .. " [" .. default .. "]"
+    label.Text = name .. " [" .. tostring(defaultValue) .. "]"
     label.TextColor3 = Color3.fromRGB(255, 255, 255)
     label.Font = Enum.Font.GothamMedium
     label.TextSize = 12
@@ -2206,127 +3488,71 @@ local function CreateMovementSetting(name, min, max, default, callback)
     input.Size = UDim2.new(1, 0, 0, 25)
     input.Position = UDim2.new(0, 0, 0, 20)
     input.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-    input.Text = tostring(default)
+    input.Text = tostring(defaultValue)
     input.TextColor3 = Color3.fromRGB(0, 255, 0)
     input.Font = Enum.Font.GothamBold
     input.PlaceholderText = "Input angka..."
+    input.ClearTextOnFocus = false
     Instance.new("UICorner", input).CornerRadius = UDim.new(0, 6)
 
-    input.FocusLost:Connect(function(enter)
-        local val = tonumber(input.Text)
-        if val then
-            label.Text = name .. " [" .. val .. "]"
-            callback(val)
-        else
-            input.Text = tostring(default)
+    local control = {
+        DisplayName = name,
+        Label = label,
+        Input = input,
+        Min = minValue,
+        Max = maxValue,
+        Default = defaultValue
+    }
+    MovementControls[name] = control
+
+    input.FocusLost:Connect(function()
+        local value = tonumber(input.Text)
+        if not value then
+            input.Text = tostring(control.Default)
+            label.Text = name .. " [" .. tostring(control.Default) .. "]"
+            ShowNotification(name .. " harus berupa angka")
+            return
         end
+
+        value = math.clamp(value, minValue, maxValue)
+        control.Default = value
+        UpdateMovementControl(name, value)
+        callback(value)
     end)
+
+    return control
 end
 
--- 1. Walk Speed
-CreateMovementSetting("Walk Speed", 0, 500, 16, function(v)
-    if player.Character and player.Character:FindFirstChild("Humanoid") then
-        player.Character.Humanoid.WalkSpeed = v
+local initialWalkSpeed = MovementDefaults.WalkSpeed
+local initialJumpPower = MovementDefaults.JumpPower
+local initialFlySpeed = MovementDefaults.FlySpeed
+
+CreateMovementSetting("Walk Speed", 0, 500, initialWalkSpeed, function(value)
+    local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+    if hum then
+        hum.WalkSpeed = value
     end
 end)
 
--- 2. Jump Power
-CreateMovementSetting("Jump Power", 0, 500, 50, function(v)
-    if player.Character and player.Character:FindFirstChild("Humanoid") then
-        player.Character.Humanoid.UseJumpPower = true
-        player.Character.Humanoid.JumpPower = v
+CreateMovementSetting("Jump Power", 0, 500, initialJumpPower, function(value)
+    local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+    if hum then
+        hum.UseJumpPower = true
+        hum.JumpPower = value
     end
 end)
 
--- 3. Fly Speed (Sinkron dengan variabel FlySpeed)
-CreateMovementSetting("Fly Speed", 0, 1000, 50, function(v)
-    v = math.clamp(tonumber(v) or 50, 0, 1000)
-
-    -- Paksa global update
-    _G.FlySpeed = v
-    FlySpeed = v
-
-    -- Jika sedang fly, langsung refresh velocity
-    if Flying and BodyVelocity then
-        local camera = workspace.CurrentCamera
-        local moveDir = Vector3.zero
-
-        if UserInputService:IsKeyDown(Enum.KeyCode.W) then
-            moveDir += camera.CFrame.LookVector
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.S) then
-            moveDir -= camera.CFrame.LookVector
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.A) then
-            moveDir -= camera.CFrame.RightVector
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.D) then
-            moveDir += camera.CFrame.RightVector
-        end
-
-        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
-            moveDir += camera.CFrame.UpVector
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
-            moveDir -= camera.CFrame.UpVector
-        end
-
-        if moveDir.Magnitude > 0 then
-            moveDir = moveDir.Unit
-        end
-
-        BodyVelocity.Velocity = moveDir * v
-    end
-
-    ShowNotification("Fly Speed set to: " .. v)
+CreateMovementSetting("Fly Speed", 0, 1000, initialFlySpeed, function(value)
+    FlySpeed = value
+    _G.FlySpeed = value
+    ShowNotification("Fly Speed: " .. tostring(value))
 end)
-
-local DefaultWalkSpeed = 16
-local DefaultJumpPower = 50
-local DefaultFlySpeed = 50
 
 if movementTabFrame then
-    local resetMovementBtn = AddScriptButton("Reset Movement", function()
-        FlySpeed = DefaultFlySpeed
-        _G.FlySpeed = DefaultFlySpeed
-
-        local char = player.Character
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
-
-        if hum then
-            hum.WalkSpeed = DefaultWalkSpeed
-            hum.UseJumpPower = true
-            hum.JumpPower = DefaultJumpPower
+    AddScriptButton("Reset Movement", function()
+        if ResetMovement then
+            ResetMovement()
         end
-
-        if Flying and BodyVelocity then
-            BodyVelocity.Velocity = Vector3.zero
-        end
-
-        -- Update UI textbox otomatis
-        for _, obj in pairs(movementTabFrame:GetDescendants()) do
-            if obj:IsA("TextBox") then
-                local parentFrame = obj.Parent
-                local label = parentFrame:FindFirstChildWhichIsA("TextLabel")
-
-                if label then
-                    if string.find(label.Text, "Walk Speed") then
-                        obj.Text = tostring(DefaultWalkSpeed)
-                        label.Text = "Walk Speed [" .. DefaultWalkSpeed .. "]"
-
-                    elseif string.find(label.Text, "Jump Power") then
-                        obj.Text = tostring(DefaultJumpPower)
-                        label.Text = "Jump Power [" .. DefaultJumpPower .. "]"
-
-                    elseif string.find(label.Text, "Fly Speed") then
-                        obj.Text = tostring(DefaultFlySpeed)
-                        label.Text = "Fly Speed [" .. DefaultFlySpeed .. "]"
-                    end
-                end
-            end
-        end
-
-        ShowNotification("Movement Reset To Default")
     end, movementTabFrame)
 end
 
@@ -2410,107 +3636,45 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 end)
 
 minBtn.MouseButton1Click:Connect(toggleMinimize)
-closeBtn.MouseButton1Click:Connect(function() gui:Destroy() end)
-
--- Handler ini memastikan saat karakter spawn ulang, variabel di script tetap akurat
-player.CharacterAdded:Connect(function(newChar)
-    task.wait(0.5) -- Beri waktu sistem memuat komponen
-    local humanoid = newChar:WaitForChild("Humanoid")
-    print("Karakter diperbarui untuk eksekusi saat ini.")
+closeBtn.MouseButton1Click:Connect(function()
+    if CleanupMovementFeatures then
+        CleanupMovementFeatures()
+    end
+    if StopLicenseHeartbeat then
+        StopLicenseHeartbeat()
+    end
+    gui:Destroy()
 end)
 
--- 🔹 INTEGRASI LOGIKA FLY SYSTEM BROKEN 🔹
-local Flying = false
-local FlySpeed = 50
-local BodyGyro, BodyVelocity
-local FlyConnection
+-- ============================================================
+-- DVISUAL - FLY BODY DIRECTION FIX
+-- Ganti seluruh blok Fly pada script terbaru dengan blok ini.
+-- Mulai dari komentar "FLY SYSTEM" sampai sebelum blok AVA LIGHT.
+-- ============================================================
 
--- --- 🔹 INTEGRASI LOGIKA FLY (SystemBroken Mode) 🔹 ---
-local function StartFlying()
-    local char = player.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    local hum = char and char:FindFirstChildOfClass("Humanoid")
-    if not root or not hum then return end
+local flyBtn = nil
 
-    -- Anti duplicate
-    if Flying then return end
+local function UpdateFlyButton()
+    if not flyBtn or not flyBtn.Parent then
+        return
+    end
 
-    Flying = true
+    flyBtn.Text = Flying and "Fly: ON" or "Fly: OFF"
+    flyBtn.BackgroundColor3 = Flying
+        and Color3.fromRGB(60, 180, 100)
+        or Color3.fromRGB(150, 60, 255)
+end
 
-    -- Bersihkan object lama
-    if BodyGyro then BodyGyro:Destroy() end
-    if BodyVelocity then BodyVelocity:Destroy() end
+-- Menghapus semua sisa pengontrol Fly yang mungkin tertinggal.
+local function RemoveFlyPhysics(root)
     if FlyConnection then
         FlyConnection:Disconnect()
         FlyConnection = nil
     end
 
-    BodyGyro = Instance.new("BodyGyro")
-    BodyGyro.P = 9e4
-    BodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
-    BodyGyro.CFrame = root.CFrame
-    BodyGyro.Parent = root
-
-    BodyVelocity = Instance.new("BodyVelocity")
-    BodyVelocity.Velocity = Vector3.zero
-    BodyVelocity.MaxForce = Vector3.new(9e9, 9e9, 9e9)
-    BodyVelocity.Parent = root
-
-    FlyConnection = RunService.RenderStepped:Connect(function()
-        if not Flying or not root.Parent or hum.Health <= 0 then
-            StopFlying()
-            return
-        end
-
-        local camera = workspace.CurrentCamera
-        local moveDir = Vector3.zero
-
-        -- Forward / Back
-        if UserInputService:IsKeyDown(Enum.KeyCode.W) then
-            moveDir += camera.CFrame.LookVector
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.S) then
-            moveDir -= camera.CFrame.LookVector
-        end
-
-        -- Left / Right
-        if UserInputService:IsKeyDown(Enum.KeyCode.A) then
-            moveDir -= camera.CFrame.RightVector
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.D) then
-            moveDir += camera.CFrame.RightVector
-        end
-
-        -- Up / Down
-		if UserInputService:IsKeyDown(Enum.KeyCode.Q) then
-			moveDir += camera.CFrame.UpVector
-		end
-
-		if UserInputService:IsKeyDown(Enum.KeyCode.E) then
-			moveDir -= camera.CFrame.UpVector
-		end
-
-        -- Normalisasi agar speed stabil
-        if moveDir.Magnitude > 0 then
-            moveDir = moveDir.Unit
-        end
-
-        -- FlySpeed dari slider langsung aktif
-        BodyVelocity.Velocity = moveDir * (_G.FlySpeed or FlySpeed or 50)
-
-        -- Arah kamera
-        BodyGyro.CFrame = camera.CFrame
-
-        hum.PlatformStand = true
-    end)
-end
-
-local function StopFlying()
-    Flying = false
-
-    if FlyConnection then
-        FlyConnection:Disconnect()
-        FlyConnection = nil
+    if FlyHumanoidDiedConnection then
+        FlyHumanoidDiedConnection:Disconnect()
+        FlyHumanoidDiedConnection = nil
     end
 
     if BodyGyro then
@@ -2523,138 +3687,432 @@ local function StopFlying()
         BodyVelocity = nil
     end
 
-    if player.Character then
-        local hum = player.Character:FindFirstChildOfClass("Humanoid")
-        if hum then
-            hum.PlatformStand = false
+    -- Membersihkan object lama jika script sebelumnya pernah membuat duplikat.
+    if root then
+        local oldGyro = root:FindFirstChild("DvisualFlyGyro")
+        if oldGyro then
+            oldGyro:Destroy()
+        end
+
+        local oldVelocity = root:FindFirstChild("DvisualFlyVelocity")
+        if oldVelocity then
+            oldVelocity:Destroy()
         end
     end
 end
 
--- Menambahkan tombol ke tab Movement (⚡) di script Anda
-if movementTabFrame then
-    local flyBtn = AddScriptButton("Fly: OFF", function()
-        if not Flying then
-            StartFlying()
-            ShowNotification("Fly Activated (SystemBroken Mode)")
+-- Mengembalikan arah badan dan kontrol Humanoid setelah Fly dimatikan.
+local function RestoreBodyControl(character)
+    local char = character or player.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+
+    if not hum or hum.Health <= 0 then
+        return
+    end
+
+    -- Hapus momentum dan putaran dari BodyGyro/BodyVelocity.
+    if root then
+        root.AssemblyLinearVelocity = Vector3.zero
+        root.AssemblyAngularVelocity = Vector3.zero
+
+        -- Tegakkan badan dan arahkan secara horizontal mengikuti kamera.
+        local camera = workspace.CurrentCamera
+        local lookVector = camera and camera.CFrame.LookVector or root.CFrame.LookVector
+        local flatLook = Vector3.new(lookVector.X, 0, lookVector.Z)
+
+        if flatLook.Magnitude > 0.001 then
+            root.CFrame = CFrame.lookAt(
+                root.Position,
+                root.Position + flatLook.Unit,
+                Vector3.yAxis
+            )
         else
-            StopFlying()
-            ShowNotification("Fly Deactivated")
+            local currentLook = root.CFrame.LookVector
+            local flatCurrentLook = Vector3.new(currentLook.X, 0, currentLook.Z)
+
+            if flatCurrentLook.Magnitude > 0.001 then
+                root.CFrame = CFrame.lookAt(
+                    root.Position,
+                    root.Position + flatCurrentLook.Unit,
+                    Vector3.yAxis
+                )
+            end
+        end
+    end
+
+    -- Paksa kontrol karakter kembali normal.
+    hum.PlatformStand = false
+    hum.Sit = false
+    hum.AutoRotate = true
+    hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+
+    -- Beberapa game mengubah state kembali satu frame setelah BodyMover dihapus.
+    -- Karena itu pemulihan dilakukan sekali lagi setelah physics update.
+    task.spawn(function()
+        RunService.Heartbeat:Wait()
+        RunService.Heartbeat:Wait()
+
+        if hum.Parent and hum.Health > 0 then
+            hum.PlatformStand = false
+            hum.Sit = false
+            hum.AutoRotate = true
+            hum:ChangeState(Enum.HumanoidStateType.Running)
+
+            if root and root.Parent then
+                root.AssemblyAngularVelocity = Vector3.zero
+            end
+        end
+    end)
+end
+
+StopFlying = function(silent)
+    Flying = false
+
+    local char = player.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+
+    RemoveFlyPhysics(root)
+    RestoreBodyControl(char)
+
+    PreviousFlyHumanoidState = nil
+    UpdateFlyButton()
+
+    if not silent then
+        ShowNotification("Fly: OFF | Kontrol arah dipulihkan")
+    end
+end
+
+local function StartFlying(silent)
+    if Flying then
+        UpdateFlyButton()
+        return true
+    end
+
+    local char = player.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+
+    if not root or not hum or hum.Health <= 0 then
+        ShowNotification("Karakter belum siap untuk Fly")
+        return false
+    end
+
+    -- Bersihkan sisa object Fly tanpa menjalankan proses pemulihan arah.
+    RemoveFlyPhysics(root)
+
+    PreviousFlyHumanoidState = {
+        PlatformStand = hum.PlatformStand,
+        AutoRotate = hum.AutoRotate
+    }
+
+    Flying = true
+    hum.PlatformStand = true
+    hum.AutoRotate = false
+
+    BodyGyro = Instance.new("BodyGyro")
+    BodyGyro.Name = "DvisualFlyGyro"
+    BodyGyro.P = 9e4
+    BodyGyro.D = 1000
+    BodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+    BodyGyro.CFrame = root.CFrame
+    BodyGyro.Parent = root
+
+    BodyVelocity = Instance.new("BodyVelocity")
+    BodyVelocity.Name = "DvisualFlyVelocity"
+    BodyVelocity.P = 9e4
+    BodyVelocity.Velocity = Vector3.zero
+    BodyVelocity.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+    BodyVelocity.Parent = root
+
+    FlyHumanoidDiedConnection = hum.Died:Connect(function()
+        StopFlying(true)
+    end)
+
+    FlyConnection = RunService.RenderStepped:Connect(function()
+        if not Flying or not root:IsDescendantOf(workspace) or hum.Health <= 0 then
+            StopFlying(true)
+            return
+        end
+
+        local camera = workspace.CurrentCamera
+        if not camera or not BodyVelocity or not BodyGyro then
+            StopFlying(true)
+            return
+        end
+
+        local moveDirection = Vector3.zero
+
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+            moveDirection += camera.CFrame.LookVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+            moveDirection -= camera.CFrame.LookVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+            moveDirection -= camera.CFrame.RightVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+            moveDirection += camera.CFrame.RightVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Q) then
+            moveDirection += Vector3.yAxis
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.E) then
+            moveDirection -= Vector3.yAxis
+        end
+
+        if moveDirection.Magnitude > 0 then
+            moveDirection = moveDirection.Unit
+        end
+
+        BodyVelocity.Velocity = moveDirection * FlySpeed
+
+        -- Hanya gunakan arah horizontal kamera.
+        -- Tubuh tidak lagi ikut miring ke atas/bawah bersama kamera.
+        local cameraLook = camera.CFrame.LookVector
+        local flatCameraLook = Vector3.new(cameraLook.X, 0, cameraLook.Z)
+
+        if flatCameraLook.Magnitude > 0.001 then
+            BodyGyro.CFrame = CFrame.lookAt(
+                root.Position,
+                root.Position + flatCameraLook.Unit,
+                Vector3.yAxis
+            )
+        end
+
+        hum.PlatformStand = true
+        hum.AutoRotate = false
+    end)
+
+    UpdateFlyButton()
+
+    if not silent then
+        ShowNotification("Fly: ON | Q naik, E turun")
+    end
+
+    return true
+end
+
+if movementTabFrame then
+    flyBtn = AddScriptButton("Fly: OFF", function()
+        if Flying then
+            StopFlying(false)
+        else
+            StartFlying(false)
         end
     end, movementTabFrame)
 
-	UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    -- Jangan aktif jika sedang mengetik di TextBox / UI
-    if gameProcessed then return end
-    
+    UpdateFlyButton()
+end
+
+if FlyShortcutConnection then
+    FlyShortcutConnection:Disconnect()
+    FlyShortcutConnection = nil
+end
+
+FlyShortcutConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed or UserInputService:GetFocusedTextBox() then
+        return
+    end
+
     if input.KeyCode == Enum.KeyCode.F then
-        if not Flying then
-            StartFlying()
-            ShowNotification("Fly Activated (Shortcut F)")
+        if Flying then
+            StopFlying(false)
         else
-            StopFlying()
-            ShowNotification("Fly Deactivated (Shortcut F)")
+            StartFlying(false)
         end
     end
 end)
 
-    -- Loop kecil untuk update teks tombol secara otomatis
-    task.spawn(function()
-        while task.wait(0.2) do
-            if flyBtn then
-                flyBtn.Text = Flying and "Fly: ON" or "Fly: OFF"
-                flyBtn.BackgroundColor3 = Flying and Color3.fromRGB(60, 180, 100) or Color3.fromRGB(150, 60, 255)
-            end
-        end
-    end)
-end
-
 --- --- --- --- --- --- --- --- --- --- --- --- ---
--- FITUR AVATAR LIGHT (Mode Lampu)
+-- FITUR AVATAR LIGHT (BERSIH, IDEMPOTEN, DAN SUPPORT RESPAWN)
 --- --- --- --- --- --- --- --- --- --- --- --- ---
 local AvaLightActive = false
 local LightParts = {}
+local avaLightBtn = nil
 
-local function ToggleAvaLight()
-    local char = player.Character
-    if not char then return end
-    
-    AvaLightActive = not AvaLightActive
-    
-    if AvaLightActive then
-        -- Menambahkan cahaya ke HumanoidRootPart agar menyebar dari tengah
-        local root = char:FindFirstChild("HumanoidRootPart")
-        if root then
-            local pLight = Instance.new("PointLight")
-            pLight.Brightness = 1.5 -- Seberapa terang
-            pLight.Range = 40      -- Jarak pancaran cahaya
-            pLight.Color = Color3.fromRGB(255, 255, 255)
-            pLight.Parent = root
-            table.insert(LightParts, pLight)
-        end
+local function UpdateAvaLightButton()
+    if not avaLightBtn or not avaLightBtn.Parent then return end
 
-        -- Membuat seluruh tubuh bersinar (Efek Glow)
-        local highlight = Instance.new("Highlight")
-        highlight.Name = "AvaGlow"
-        highlight.FillColor = Color3.fromRGB(255, 255, 255)
-        highlight.FillTransparency = 0.5
-        highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-        highlight.OutlineTransparency = 0
-        highlight.Parent = char
-        table.insert(LightParts, highlight)
-        
-        ShowNotification("Avatar Light: ON")
-    else
-        -- Mematikan semua efek lampu
-        for _, obj in pairs(LightParts) do
-            if obj then obj:Destroy() end
+    avaLightBtn.Text = AvaLightActive and "Ava Light: ON" or "Ava Light: OFF"
+    avaLightBtn.BackgroundColor3 = AvaLightActive
+        and Color3.fromRGB(255, 255, 255)
+        or Color3.fromRGB(40, 40, 40)
+    avaLightBtn.TextColor3 = AvaLightActive
+        and Color3.fromRGB(0, 0, 0)
+        or Color3.fromRGB(255, 255, 255)
+end
+
+local function RemoveAvaLightFromCharacter(character)
+    for _, object in ipairs(LightParts) do
+        if object and object.Parent then
+            object:Destroy()
         end
-        local oldGlow = char:FindFirstChild("AvaGlow")
-        if oldGlow then oldGlow:Destroy() end
-        
-        LightParts = {}
-        ShowNotification("Avatar Light: OFF")
+    end
+    LightParts = {}
+
+    if character then
+        for _, object in ipairs(character:GetDescendants()) do
+            if object.Name == "DvisualAvaPointLight" or object.Name == "DvisualAvaGlow" then
+                object:Destroy()
+            end
+        end
     end
 end
 
--- Menambahkan tombol ke tab Movement (⚡)
-if movementTabFrame then
-    local avaLightBtn = AddScriptButton("Ava Light: OFF", function()
-        ToggleAvaLight()
-    end, movementTabFrame)
+ApplyAvaLightToCharacter = function(character)
+    if not character then return false end
 
-    -- Update tampilan tombol
-    task.spawn(function()
-        while task.wait(0.2) do
-            if avaLightBtn then
-                avaLightBtn.Text = AvaLightActive and "Ava Light: ON" or "Ava Light: OFF"
-                avaLightBtn.BackgroundColor3 = AvaLightActive and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(40, 40, 40)
-                avaLightBtn.TextColor3 = AvaLightActive and Color3.fromRGB(0, 0, 0) or Color3.fromRGB(255, 255, 255)
-            end
-        end
-    end)
+    RemoveAvaLightFromCharacter(character)
+
+    local root = character:FindFirstChild("HumanoidRootPart")
+    if not root then
+        return false
+    end
+
+    local pointLight = Instance.new("PointLight")
+    pointLight.Name = "DvisualAvaPointLight"
+    pointLight.Brightness = 1.5
+    pointLight.Range = 40
+    pointLight.Color = Color3.fromRGB(255, 255, 255)
+    pointLight.Shadows = false
+    pointLight.Parent = root
+    table.insert(LightParts, pointLight)
+
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "DvisualAvaGlow"
+    highlight.Adornee = character
+    highlight.FillColor = Color3.fromRGB(255, 255, 255)
+    highlight.FillTransparency = 0.5
+    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+    highlight.OutlineTransparency = 0
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    highlight.Parent = character
+    table.insert(LightParts, highlight)
+
+    return true
 end
+
+SetAvaLight = function(enabled, silent)
+    enabled = enabled == true
+
+    if enabled then
+        local char = player.Character
+        if not char or not ApplyAvaLightToCharacter(char) then
+            AvaLightActive = false
+            UpdateAvaLightButton()
+            if not silent then
+                ShowNotification("Karakter belum siap untuk Ava Light")
+            end
+            return false
+        end
+
+        AvaLightActive = true
+    else
+        AvaLightActive = false
+        RemoveAvaLightFromCharacter(player.Character)
+    end
+
+    UpdateAvaLightButton()
+    if not silent then
+        ShowNotification(AvaLightActive and "Avatar Light: ON" or "Avatar Light: OFF")
+    end
+    return true
+end
+
+if movementTabFrame then
+    avaLightBtn = AddScriptButton("Ava Light: OFF", function()
+        SetAvaLight(not AvaLightActive, false)
+    end, movementTabFrame)
+    UpdateAvaLightButton()
+end
+
+ResetMovement = function()
+    -- Fly harus dimatikan terlebih dahulu agar PlatformStand dan physics kembali normal.
+    if StopFlying then
+        StopFlying(true)
+    end
+
+    local char = player.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+
+    if hum then
+        if not MovementDefaults.Captured then
+            CaptureMovementDefaults(char, true)
+        end
+
+        hum.WalkSpeed = MovementDefaults.WalkSpeed
+        hum.UseJumpPower = MovementDefaults.UseJumpPower
+        hum.JumpPower = MovementDefaults.JumpPower
+        hum.JumpHeight = MovementDefaults.JumpHeight
+    end
+
+    FlySpeed = MovementDefaults.FlySpeed
+    _G.FlySpeed = MovementDefaults.FlySpeed
+
+    UpdateMovementControl("Walk Speed", MovementDefaults.WalkSpeed)
+    UpdateMovementControl("Jump Power", MovementDefaults.JumpPower)
+    UpdateMovementControl("Fly Speed", MovementDefaults.FlySpeed)
+
+    ShowNotification("Movement dikembalikan ke nilai sebelumnya")
+end
+
+CleanupMovementFeatures = function()
+    if StopFlying then
+        StopFlying(true)
+    end
+
+    if SetAvaLight then
+        SetAvaLight(false, true)
+    end
+
+    if FlyShortcutConnection then
+        FlyShortcutConnection:Disconnect()
+        FlyShortcutConnection = nil
+    end
+end
+
 
 --- --- 🔹 SINGLE RESPOND SYSTEM (REPLACER) 🔹 --- ---
 -- Hapus semua Player.CharacterAdded yang lain, cukup pakai yang ini:
 
 local function CleanReapply(char)
+    -- Fly lama tidak boleh membawa BodyMover/PlatformStand ke karakter baru.
+    if StopFlying then
+        StopFlying(true)
+    end
+
     -- 1. Tunggu Humanoid & Animate benar-benar masuk ke Workspace
     local hum = char:WaitForChild("Humanoid", 10)
     local animScript = char:WaitForChild("Animate", 10)
     
     if hum and animScript then
+        -- Simpan nilai asli dari karakter baru untuk Reset Movement.
+        CaptureMovementDefaults(char, true)
+        UpdateMovementControl("Walk Speed", MovementDefaults.WalkSpeed)
+        UpdateMovementControl("Jump Power", MovementDefaults.JumpPower)
+        UpdateMovementControl("Fly Speed", MovementDefaults.FlySpeed)
         -- 2. Jeda yang lebih aman (Roblox butuh waktu untuk inisialisasi internal)
         task.wait(1.5) 
         
-        -- 3. Pasang ulang semua yang tersimpan
-        for category, data in pairs(SavedAnimations) do
-            if data then
-                -- Kita panggil fungsinya dengan task.spawn agar tidak saling tunggu
-                task.spawn(function()
-                    ApplyInstantAnimation(category, data)
-                end)
+        -- 3. Pasang ulang seluruh animasi dalam satu batch agar tidak terjadi race condition.
+        local hasSavedAnimation = false
+        for _, data in pairs(SavedAnimations) do
+            if data ~= nil then
+                hasSavedAnimation = true
+                break
             end
+        end
+
+        if hasSavedAnimation then
+            ApplyAnimationBatch(SavedAnimations)
+        end
+
+        -- Jika Ava Light sebelumnya ON, pasang kembali satu kali pada karakter baru.
+        if AvaLightActive and ApplyAvaLightToCharacter then
+            ApplyAvaLightToCharacter(char)
+            UpdateAvaLightButton()
         end
     end
 end
