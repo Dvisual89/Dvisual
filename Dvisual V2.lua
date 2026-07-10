@@ -8,7 +8,7 @@ local MarketplaceService = game:GetService("MarketplaceService")
 local player = Players.LocalPlayer
 
 local API_URL = "https://dvisual-api.budiksh6.workers.dev"
-local API_TOKEN = "dvisual_dimskuyyy21"
+local API_TOKEN = "dimskuyyy21"
 local VERSION = "1.0.1"
 
 -- License key tidak lagi disimpan sebagai nilai default di dalam script.
@@ -24,6 +24,91 @@ end
 local LICENSE_KEY = ""
 RuntimeEnvironment.DVISUAL_LICENSE_KEY = nil
 
+local LICENSE_FOLDER = "DVisual"
+local LICENSE_FILE = LICENSE_FOLDER.."/license.json"
+
+
+local function SaveLicenseData(data)
+
+    if not isfolder(LICENSE_FOLDER) then
+        makefolder(LICENSE_FOLDER)
+    end
+
+    writefile(
+        LICENSE_FILE,
+        HttpService:JSONEncode(data)
+    )
+
+end
+
+
+local function LoadLicenseData()
+
+    if not isfile(LICENSE_FILE) then
+        return nil
+    end
+
+
+    local ok,result = pcall(function()
+
+        return HttpService:JSONDecode(
+            readfile(LICENSE_FILE)
+        )
+
+    end)
+
+
+    if ok then
+        return result
+    end
+
+end
+
+
+
+local function RemoveSavedLicense()
+
+    if isfile(LICENSE_FILE) then
+        delfile(LICENSE_FILE)
+    end
+
+end
+
+-- ============================================================
+-- LICENSE LOCAL STORAGE
+-- ============================================================
+
+local function LoadLicenseKey()
+
+    if isfile(LICENSE_FILE) then
+        
+        local saved = readfile(
+            LICENSE_FILE
+        )
+
+        return NormalizeLicenseKey(saved)
+
+    end
+
+
+    return nil
+
+end
+
+
+
+local function RemoveSavedLicense()
+
+    if isfile(LICENSE_FILE) then
+
+        delfile(
+            LICENSE_FILE
+        )
+
+    end
+
+end
+
 local REQUEST_FUNCTION =
     request
     or http_request
@@ -36,6 +121,103 @@ local LicenseState = {
     Session = nil,
     LastError = nil
 }
+
+local function GetLicenseTimeLeft()
+
+    if not LicenseState.ExpireAt then
+        return "Lifetime"
+    end
+
+
+    local expireTimestamp =
+        DateTime.fromIsoDate(LicenseState.ExpireAt).UnixTimestamp
+
+
+    local remaining =
+        expireTimestamp - os.time()
+
+
+    if remaining <= 0 then
+        return "Expired"
+    end
+
+
+    local days =
+        math.floor(remaining / 86400)
+
+
+    local hours =
+        math.floor(
+            (remaining % 86400) / 3600
+        )
+
+
+    local minutes =
+        math.floor(
+            (remaining % 3600) / 60
+        )
+
+
+    return string.format(
+        "%dD %02dH %02dM",
+        days,
+        hours,
+        minutes
+    )
+
+end
+
+local function GetRemainingTime(expire)
+
+
+    if not expire then
+        return "Unknown"
+    end
+
+
+    local ok, expireTime = pcall(function()
+    return DateTime.fromIsoDate(expire).UnixTimestamp
+	end)
+
+	if not ok then
+		return "Invalid Date"
+	end
+
+
+    local remain =
+    expireTime - os.time()
+
+
+    if remain <= 0 then
+        return "Expired"
+    end
+
+
+    local days =
+    math.floor(remain / 86400)
+
+
+    local hours =
+    math.floor((remain % 86400)/3600)
+
+
+    local minutes =
+    math.floor((remain % 3600)/60)
+
+
+    local seconds =
+    remain % 60
+
+
+    return string.format(
+        "%dd %02dh %02dm %02ds",
+        days,
+        hours,
+        minutes,
+        seconds
+    )
+
+end
 
 local function ValidateLocalLicenseKey(key)
     if type(key) ~= "string" or key == "" then
@@ -153,10 +335,42 @@ local function CheckLicense(candidateKey)
     end
 
     LICENSE_KEY = normalizedKey
-    RuntimeEnvironment.DVISUAL_LICENSE_KEY = LICENSE_KEY
+
+	RuntimeEnvironment.DVISUAL_LICENSE_KEY = LICENSE_KEY
+
+
+	LicenseState.Expire =
+	data.expire
+
+
+
+	pcall(function()
+
+		SaveLicenseData({
+
+			key = LICENSE_KEY,
+
+			expire = data.expire,
+
+			userid = player.UserId
+
+		})
+
+	end)
+
+
+	-- simpan license lokal
+	pcall(function()
+
+		SaveLicenseKey(
+			LICENSE_KEY
+		)
+
+	end)
     LicenseState.Active = true
     LicenseState.Type = tostring(data.type or data.license_type or "Valid")
     LicenseState.Session = data.session or data.session_token or data.token
+	LicenseState.ExpireAt = data.expire or data.expire_at
     LicenseState.LastError = nil
 
     print("[Dvisual] License accepted:", LicenseState.Type)
@@ -195,6 +409,52 @@ local function SendReport()
 
     print("[Dvisual] Report sent")
     return true
+end
+
+-- ============================================================
+-- AUTO LICENSE LOGIN
+-- ============================================================
+
+local function TrySavedLicense()
+
+    local savedKey = LoadLicenseKey()
+
+
+    if not savedKey then
+        return false
+    end
+
+
+    print("[Dvisual] Checking saved license...")
+
+
+    local success = CheckLicense(
+        savedKey
+    )
+
+
+    if success then
+
+        print("[Dvisual] Saved license accepted")
+
+        return true
+
+    end
+
+
+
+    -- kalau gagal hapus cache
+
+    RemoveSavedLicense()
+
+
+    print(
+        "[Dvisual] Saved license invalid, requesting new key"
+    )
+
+
+    return false
+
 end
 
 -- ============================================================
@@ -466,13 +726,56 @@ local function CreateLicensePrompt()
     return accepted == true
 end
 
--- License prompt adalah gate utama. Menu Dvisual belum dibuat sampai key valid.
-if not CreateLicensePrompt() then
-    warn("[Dvisual] Access Denied: " .. tostring(LicenseState.LastError or "License verification cancelled"))
+-- ============================================================
+-- LICENSE GATE
+-- ============================================================
+
+
+local licenseAccepted = false
+
+
+local saved = LoadLicenseData()
+
+
+if saved then
+
+    print("[Dvisual] Checking saved license")
+
+    print(
+        "Remaining:",
+        GetRemainingTime(saved.expire)
+    )
+
+
+    licenseAccepted =
+    CheckLicense(saved.key)
+
+
+end
+
+
+
+if not licenseAccepted then
+
+    licenseAccepted =
+    CreateLicensePrompt()
+
+end
+
+
+
+if not licenseAccepted then
+
+    warn(
+    "[Dvisual] Access Denied"
+    )
+
     return
+
 end
 
 task.spawn(SendReport)
+
 
 -- ============================================================
 -- LICENSE HEARTBEAT
@@ -794,6 +1097,62 @@ CreateInfoLabel("ID: " .. player.UserId)
 CreateInfoLabel("Account Age: " .. player.AccountAge .. " Days")
 CreateInfoLabel("Join Date: " .. GetJoinDate()) -- Menampilkan Join Date
 CreateInfoLabel("Game: " .. gName)
+
+-- ============================================================
+-- LICENSE TIME INFO
+-- ============================================================
+
+local licenseTimeInfo = Instance.new("TextLabel")
+licenseTimeInfo.Parent = infoTabFrame
+licenseTimeInfo.Size = UDim2.new(1,0,0,25)
+licenseTimeInfo.BackgroundTransparency = 1
+licenseTimeInfo.Text = " • License: Calculating..."
+licenseTimeInfo.TextColor3 = Color3.fromRGB(105,231,155)
+licenseTimeInfo.Font = Enum.Font.GothamBold
+licenseTimeInfo.TextSize = 12
+licenseTimeInfo.TextXAlignment = Enum.TextXAlignment.Left
+
+
+task.spawn(function()
+
+    while licenseTimeInfo.Parent do
+
+        local expire =
+            LicenseState.ExpireAt
+            or LicenseState.Expire
+
+
+        local remaining =
+            GetRemainingTime(expire)
+
+
+        licenseTimeInfo.Text =
+            " • License Time: "..remaining
+
+
+        if remaining == "Expired" then
+
+            licenseTimeInfo.TextColor3 =
+                Color3.fromRGB(255,100,100)
+
+        elseif remaining == "Lifetime" then
+
+            licenseTimeInfo.TextColor3 =
+                Color3.fromRGB(100,180,255)
+
+        else
+
+            licenseTimeInfo.TextColor3 =
+                Color3.fromRGB(105,231,155)
+
+        end
+
+
+        task.wait(1)
+
+    end
+
+end)
 
 local function BorrowSelectedPlayerAvatar(targetUsername)
     local targetPlayer = Players:FindFirstChild(targetUsername)
