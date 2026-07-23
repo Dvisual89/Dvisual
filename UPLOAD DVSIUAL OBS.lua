@@ -1263,7 +1263,7 @@ AddScriptButton("Laser", function()
 end)
 
 AddScriptButton("Animate SPy", function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/Dvisual89/Dvisual/refs/heads/main/Animation%20and%20Emotes%20Spy%20ASSETS%20ID.lua"))()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/Kixdev/animation-pack-spy/main/main.lua", true))()
     ShowNotification("Animation Executed!")
 end)
 
@@ -1309,6 +1309,11 @@ end)
 
 AddScriptButton("Remotespy Fayint", function()
     loadstring(game:HttpGet("https://fayintz.my.id/api/loader/Scanner-Remote"))()
+    ShowNotification("Animation Executed!")
+end)
+
+AddScriptButton("Fk Climb & Swim", function()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/Dvisual89/Dvisual/refs/heads/main/Fake%20Climb%20and%20Swim.lua"))()
     ShowNotification("Animation Executed!")
 end)
 
@@ -1441,6 +1446,9 @@ mainListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
 local AnimationData = {
     ["Idle"] = {
+				["Witch Broom"] = {"110744245866814", "78162494102624"},
+				["Victoria Runway Fashion"] = {"88931727654232", "88931727654232"},
+				["Victoria Model"] = {"132069965396465", "96056370055847"},
 				["Effortless Aura"] = {"109023565617920", "101782607233045"},
 				["Pixel Animation"] = {"130194283182451", "136782362569794"},
 				["Zombie New"] = {"128132851784308", "94392532437836"},
@@ -1586,9 +1594,12 @@ local AnimationData = {
 				["Unboxed By Amazon"] = {"98281136301627", "138183121662404"}
 			},
 			["Walk"] = {
-				["(UGC) Retro Zombie"] = "140703855480494", ["(UGC) Retro"] = "107806791584829", ["(UGC) Smooth"] = "76630051272791", ["(UGC) Udin"] = "125451074692113", ["(UGC) Uget"] = "102622695004986", ["(UGC) Zombie"] = "113603435314095", ["2016 Animation (mm2)"] = "387947975", ["64 Dude Pack"] = "90014316242626", ["Adidas Aura"] = "83842218823011", ["Adidas Community"] = "122150855457006", ["Animal 1"] = "112238064449133", ["Anime Idol Animation"] = "123892408552826", ["Anime Ninja"] = "121509954212911", ["Astronaut"] = "891667138", ["Aura Animation Pack"] = "97462772841800", ["AuraAnimationPack"] = "18747074203", ["Average Stand User"] = "102431627444820", ["Backward Animation"] = "106882619223954", ["Billie Ellish"] = "111071007924288", ["Bold"] = "16738340646", ["Boxer Animation"] = "124531990122756", ["Bubbly"] = "910034870", ["Bycyclist"] = "98707881660541", ["CAT Animation"] = "128562578525167", ["Cartoony"] = "742640026", ["Cartoony Scared Animation"] = "85244122440192", ["Catwalk Glam"] = "109168724482748", ["Chill Sans Animation"] = "102322585064571", ["Confident"] = "1070017263", ["Cool Boy Animation"] = "122378149078729", ["Cowboy"] = "1014421541", ["Crawl Animation"] = "106855154141348", ["Default Retarget"] = "115825677624788", ["Deltarune Flowery"] = "74638723073919", ["Deltarune Lightner"] = "88605898422576", ["Deltarune Roaring Knight"] = "89143328199760", ["Diva Animation"] = "89565112287783", ["Dizzy Animation Pack"] = "110106034100313", ["Dog Animation"] = "96823669333608", ["Doll Animation"] = "122687078497889", ["Drooling Zombie"] = "3489174223", ["Effortless Aura"] = "96565230403734", ["Elder"] = "10921111375", ["Enchanted Fairy Animation"] = "94547195663763", ["Endless Aura"] = "140535536297327", ["FIFA Football Animation"] = "131389117059632", ["Fighter Animation"] = "136268128987143", ["Flamboyant Animation"] = "76647815644055", ["Flipped Animation"] = "93477017949252", ["Flying Animation Pack"] = "79965952836445", ["Fort Builder Animation"] = "88678863016661", ["Furry Animation"] = "104011441852459", ["Geto"] = "85811471336028", ["Ghost"] = "616013216", ["Girl Animation"] = "92999715416329", ["Glitch Animation"] = "70532084598346", ["Glow Motion"] = "85809016093530", ["Gojo"] = "95643163365384", ["Goofball Animation Pack"] = "115844278492913", ["Goofy Animation"] = "104206572530707", ["Gremlin"] = "76359514564810", ["Handstand"] = "82055796073914", ["Hatsune Miku VOCALOID"] = "107150123451401", ["Joy Animation Pack"] = "112597572150963", ["Katseye"] = "99182913548783", ["Kawaii Girl"] = "130976129535418", ["Knight"] = "10921127095", ["Levitation"] = "616013216", ["Macho Man"] = "92292256587514", ["Mage"] = "707897309", ["Military Animation Pack"] = "126435309103395", ["Mimic Animation"] = "96268950468279", ["NFL"] = "110358958299415", ["Ninja"] = "656121766", ["No Boundaries (Walmart)"] = "18747074203", ["Nonchalant Animation"] = "89854001699438", ["OldSchool"] = "10921244891", ["Patrol"] = "1151231493", ["Piksel Animation"] = "82742503182065", ["Pirate"] = "750785693", ["Popstar"] = "1212980338", ["Princess"] = "941028902", ["R15 Reanimated"] = "4211223236", ["R6"] = "12518152696", ["R6 Energy"] = "123210125864900", ["Ring Runner Animation"] = "131115506570135", ["Robot"] = "616095330", ["Rolling Animation Pack"] = "128241131366768", ["Rthro"] = "10921269718", ["Sashy Animation"] = "136879687900769", ["Scared Animation"] = "138468792534506", ["Scaredy Animation Pack"] = "94718858900785", ["Skater Animation Pack"] = "73059365804498", ["Skipping Animation"] = "102861298511025", ["Sneaky"] = "1132510133", ["Source Animation"] = "114340880259217", ["Spantom NEO / Possessed"] = "133330127310021", ["Sports (Adidas)"] = "18537392113", ["Sprinter Animation"] = "106176122428044", ["Springtap Animation"] = "83918921463631", ["Springy Animation"] = "90966053497240", ["Spyder Animation"] = "109976439277879", ["Spyder Hero Animation"] = "119802088850397", ["Stylish"] = "616146177", ["Stylized Female"] = "4708193840", ["Super Saiyan Goku DBZ"] = "110637848614810", ["Superhero"] = "10921298616", ["Superhero 2 Animation"] = "129560262949359", ["Tall Animation"] = "125858005892679", ["Thief Animation"] = "116391452602396", ["Toy"] = "782843345", ["Udzal"] = "3303162967", ["Unboxed By Amazon"] = "90478085024465", ["Undead Animation Pack"] = "122375411238115", ["Vampire"] = "1083473930", ["Viltrumite Animation"] = "132624199623293", ["Werewolf"] = "1083178339", ["Wicked (Popular)"] = "92072849924640", ["Wicked \"Dancing Through Life\""] = "73718308412641", ["Zombie"] = "616168032", ["Zombie New"] = "81931167118728"
+				["Witch Broom"] = "88565007188827", ["Victoria Runway Model"] = "121963487039367", ["Victoria Model"] = "84814915379579", ["(UGC) Retro Zombie"] = "140703855480494", ["(UGC) Retro"] = "107806791584829", ["(UGC) Smooth"] = "76630051272791", ["(UGC) Udin"] = "125451074692113", ["(UGC) Uget"] = "102622695004986", ["(UGC) Zombie"] = "113603435314095", ["2016 Animation (mm2)"] = "387947975", ["64 Dude Pack"] = "90014316242626", ["Adidas Aura"] = "83842218823011", ["Adidas Community"] = "122150855457006", ["Animal 1"] = "112238064449133", ["Anime Idol Animation"] = "123892408552826", ["Anime Ninja"] = "121509954212911", ["Astronaut"] = "891667138", ["Aura Animation Pack"] = "97462772841800", ["AuraAnimationPack"] = "18747074203", ["Average Stand User"] = "102431627444820", ["Backward Animation"] = "106882619223954", ["Billie Ellish"] = "111071007924288", ["Bold"] = "16738340646", ["Boxer Animation"] = "124531990122756", ["Bubbly"] = "910034870", ["Bycyclist"] = "98707881660541", ["CAT Animation"] = "128562578525167", ["Cartoony"] = "742640026", ["Cartoony Scared Animation"] = "85244122440192", ["Catwalk Glam"] = "109168724482748", ["Chill Sans Animation"] = "102322585064571", ["Confident"] = "1070017263", ["Cool Boy Animation"] = "122378149078729", ["Cowboy"] = "1014421541", ["Crawl Animation"] = "106855154141348", ["Default Retarget"] = "115825677624788", ["Deltarune Flowery"] = "74638723073919", ["Deltarune Lightner"] = "88605898422576", ["Deltarune Roaring Knight"] = "89143328199760", ["Diva Animation"] = "89565112287783", ["Dizzy Animation Pack"] = "110106034100313", ["Dog Animation"] = "96823669333608", ["Doll Animation"] = "122687078497889", ["Drooling Zombie"] = "3489174223", ["Effortless Aura"] = "96565230403734", ["Elder"] = "10921111375", ["Enchanted Fairy Animation"] = "94547195663763", ["Endless Aura"] = "140535536297327", ["FIFA Football Animation"] = "131389117059632", ["Fighter Animation"] = "136268128987143", ["Flamboyant Animation"] = "76647815644055", ["Flipped Animation"] = "93477017949252", ["Flying Animation Pack"] = "79965952836445", ["Fort Builder Animation"] = "88678863016661", ["Furry Animation"] = "104011441852459", ["Geto"] = "85811471336028", ["Ghost"] = "616013216", ["Girl Animation"] = "92999715416329", ["Glitch Animation"] = "70532084598346", ["Glow Motion"] = "85809016093530", ["Gojo"] = "95643163365384", ["Goofball Animation Pack"] = "115844278492913", ["Goofy Animation"] = "104206572530707", ["Gremlin"] = "76359514564810", ["Handstand"] = "82055796073914", ["Hatsune Miku VOCALOID"] = "107150123451401", ["Joy Animation Pack"] = "112597572150963", ["Katseye"] = "99182913548783", ["Kawaii Girl"] = "130976129535418", ["Knight"] = "10921127095", ["Levitation"] = "616013216", ["Macho Man"] = "92292256587514", ["Mage"] = "707897309", ["Military Animation Pack"] = "126435309103395", ["Mimic Animation"] = "96268950468279", ["NFL"] = "110358958299415", ["Ninja"] = "656121766", ["No Boundaries (Walmart)"] = "18747074203", ["Nonchalant Animation"] = "89854001699438", ["OldSchool"] = "10921244891", ["Patrol"] = "1151231493", ["Piksel Animation"] = "82742503182065", ["Pirate"] = "750785693", ["Popstar"] = "1212980338", ["Princess"] = "941028902", ["R15 Reanimated"] = "4211223236", ["R6"] = "12518152696", ["R6 Energy"] = "123210125864900", ["Ring Runner Animation"] = "131115506570135", ["Robot"] = "616095330", ["Rolling Animation Pack"] = "128241131366768", ["Rthro"] = "10921269718", ["Sashy Animation"] = "136879687900769", ["Scared Animation"] = "138468792534506", ["Scaredy Animation Pack"] = "94718858900785", ["Skater Animation Pack"] = "73059365804498", ["Skipping Animation"] = "102861298511025", ["Sneaky"] = "1132510133", ["Source Animation"] = "114340880259217", ["Spantom NEO / Possessed"] = "133330127310021", ["Sports (Adidas)"] = "18537392113", ["Sprinter Animation"] = "106176122428044", ["Springtap Animation"] = "83918921463631", ["Springy Animation"] = "90966053497240", ["Spyder Animation"] = "109976439277879", ["Spyder Hero Animation"] = "119802088850397", ["Stylish"] = "616146177", ["Stylized Female"] = "4708193840", ["Super Saiyan Goku DBZ"] = "110637848614810", ["Superhero"] = "10921298616", ["Superhero 2 Animation"] = "129560262949359", ["Tall Animation"] = "125858005892679", ["Thief Animation"] = "116391452602396", ["Toy"] = "782843345", ["Udzal"] = "3303162967", ["Unboxed By Amazon"] = "90478085024465", ["Undead Animation Pack"] = "122375411238115", ["Vampire"] = "1083473930", ["Viltrumite Animation"] = "132624199623293", ["Werewolf"] = "1083178339", ["Wicked (Popular)"] = "92072849924640", ["Wicked \"Dancing Through Life\""] = "73718308412641", ["Zombie"] = "616168032", ["Zombie New"] = "81931167118728"
 			},
 			["Run"] = {
+				["Witch Broom"] = "72662448505078",
+				["Victoria Runway Model"] = "126699764336995",
+				["Victoria Model"] = "84814915379579",
 				["Effortless Aura"] = "94645534606796",
 				["Pixel Animation"] = "99550252660076",
 				["Zombie New"] = "126853923835932",
@@ -1720,6 +1731,9 @@ local AnimationData = {
 				["Cowboy"] = "1014401683"
 			},
 			["Jump"] = {
+				["Witch Broom"] = "126300558247780",
+				["Victoria Runway Fashion"] = "129130240925508",
+				["Victoria Model"] = "78163261581163",
 				["Effortless Aura"] = "89471740791625",
 				["Pixel Animation"] = "85535465961669",
 				["Zombie New"] = "135714499879455",
@@ -1837,6 +1851,9 @@ local AnimationData = {
 				["[UGC] happy"] = "72388373557525"
 			},
 			["Fall"] = {
+				["Witch Broom"] = "70755252040051",
+				["Victoria Runway Fashion"] = "128747637609599",
+				["Victoria Model"] = "110073924253388",
 				["Effortless Aura"] = "116066537140570",
 				["Pixel Animation"] = "136658360392607",
 				["Zombie New"] = "138550244171866",
@@ -1950,6 +1967,9 @@ local AnimationData = {
 				["Cowboy"] = "1014384571"
 			},
 			["SwimIdle"] = {
+				["Witch Broom"] = "105034406292754",
+				["Victoria Runway Fashion"] = "135745578647157",
+				["Victoria Model"] = "78912734510185",
 				["Effortless Aura"] = "81300782326314",
 				["Pixel Animation"] = "94158089787378",
 				["Zombie New"] = "110009455126489",
@@ -2057,6 +2077,9 @@ local AnimationData = {
 				["Stylish"] = "10921281964"
 			},	
 			["Swim"] = {
+				["Witch Broom"] = "115169763373954",
+				["Victoria Runway Fashion"] = "122908400072952",
+				["Victoria Model"] = "106190456017627",
 				["Effortless Aura"] = "117171954618884",
 				["Pixel Animation"] = "88366029713748",
 				["Zombie New"] = "128306388995312",
@@ -2164,6 +2187,9 @@ local AnimationData = {
 				["Confident"] = "1070009914"
 			},
 			["Climb"] = {
+				["Witch Broom"] = "109017276931366",
+				["Victoria Runway Fashion"] = "138857619046508",
+				["Victoria Model"] = "87772134905508",
 				["Effortless Aura"] = "71035701144022",
 				["Pixel Animation"] = "95918841204099",
 				["Zombie New"] = "88141282105123",
@@ -3527,14 +3553,14 @@ local initialWalkSpeed = MovementDefaults.WalkSpeed
 local initialJumpPower = MovementDefaults.JumpPower
 local initialFlySpeed = MovementDefaults.FlySpeed
 
-CreateMovementSetting("Walk Speed", 0, 500, initialWalkSpeed, function(value)
+CreateMovementSetting("Walk Speed", 0, 5000, initialWalkSpeed, function(value)
     local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
     if hum then
         hum.WalkSpeed = value
     end
 end)
 
-CreateMovementSetting("Jump Power", 0, 500, initialJumpPower, function(value)
+CreateMovementSetting("Jump Power", 0, 5000, initialJumpPower, function(value)
     local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
     if hum then
         hum.UseJumpPower = true
